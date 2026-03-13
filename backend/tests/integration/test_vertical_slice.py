@@ -2,25 +2,25 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from meterweb.main import create_app
-
-
 def _client(tmp_path: Path) -> TestClient:
+    from meterweb.main import create_app
+
     app = create_app()
     app.dependency_overrides = {}
     return TestClient(app)
 
 
 def _login(client: TestClient) -> None:
-    response = client.post("/login", data={"username": "admin", "password": "admin"}, follow_redirects=False)
+    response = client.post("/login", data={"username": "admin_user", "password": "SehrSicheresPasswort123"}, follow_redirects=False)
     assert response.status_code == 303
 
 
 def test_masterdata_and_reading_flow(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'meterweb.db'}")
-    monkeypatch.setenv("SECRET_KEY", "test-secret")
-    monkeypatch.setenv("ADMIN_USERNAME", "admin")
-    monkeypatch.setenv("ADMIN_PASSWORD", "admin")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-with-32-characters!!")
+    monkeypatch.setenv("ADMIN_USERNAME", "admin_user")
+    monkeypatch.setenv("ADMIN_PASSWORD", "SehrSicheresPasswort123")
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH_FILE", str(tmp_path / "admin.hash"))
 
     client = _client(tmp_path)
     _login(client)
@@ -49,9 +49,10 @@ def test_masterdata_and_reading_flow(monkeypatch, tmp_path: Path) -> None:
 
 def test_reading_plausibility_flags_negative_delta(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'meterweb.db'}")
-    monkeypatch.setenv("SECRET_KEY", "test-secret")
-    monkeypatch.setenv("ADMIN_USERNAME", "admin")
-    monkeypatch.setenv("ADMIN_PASSWORD", "admin")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-with-32-characters!!")
+    monkeypatch.setenv("ADMIN_USERNAME", "admin_user")
+    monkeypatch.setenv("ADMIN_PASSWORD", "SehrSicheresPasswort123")
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH_FILE", str(tmp_path / "admin.hash"))
 
     client = _client(tmp_path)
     _login(client)

@@ -83,14 +83,38 @@ def dashboard(
             "meter_points": list_meter_points.execute(),
             "analytics": None,
             "reading_error": None,
+            "building_error": None,
         },
     )
 
 
 @router.post("/dashboard/buildings")
-def create_building(request: Request, name: str = Form(), use_case: CreateBuildingUseCase = Depends(get_create_building_use_case)):
+def create_building(
+    request: Request,
+    name: str = Form(),
+    use_case: CreateBuildingUseCase = Depends(get_create_building_use_case),
+    list_buildings: ListBuildingsUseCase = Depends(get_list_buildings_use_case),
+    list_units: ListUnitsUseCase = Depends(get_list_units_use_case),
+    list_meter_points: ListMeterPointsUseCase = Depends(get_list_meter_points_use_case),
+):
     require_auth(request)
-    use_case.execute(BuildingCreateDTO(name=name))
+    try:
+        use_case.execute(BuildingCreateDTO(name=name))
+    except ValueError as err:
+        return templates.TemplateResponse(
+            request,
+            "dashboard.html",
+            {
+                "lang": get_locale(request),
+                "buildings": list_buildings.execute(),
+                "units": list_units.execute(),
+                "meter_points": list_meter_points.execute(),
+                "analytics": None,
+                "reading_error": None,
+                "building_error": str(err),
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -139,5 +163,6 @@ def create_reading(
             "meter_points": list_meter_points.execute(),
             "analytics": analytics,
             "reading_error": None if reading.plausible else "Reading not plausible",
+            "building_error": None,
         },
     )

@@ -30,3 +30,18 @@ def test_analytics_calculates_consumption_and_cost() -> None:
 
     assert result.consumption == Decimal("30")
     assert result.cost == Decimal("15.0")
+
+
+def test_analytics_skips_negative_deltas() -> None:
+    register_id = uuid4()
+    readings = [
+        Reading(id=uuid4(), meter_register_id=register_id, measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc), value=Decimal("100")),
+        Reading(id=uuid4(), meter_register_id=register_id, measured_at=datetime(2025, 2, 1, tzinfo=timezone.utc), value=Decimal("80")),
+        Reading(id=uuid4(), meter_register_id=register_id, measured_at=datetime(2025, 3, 1, tzinfo=timezone.utc), value=Decimal("110")),
+    ]
+    use_case = AnalyticsUseCase(FakeReadingRepository(readings))
+
+    result = use_case.execute(uuid4(), Decimal("0.5"))
+
+    assert result.consumption == Decimal("30")
+    assert result.cost == Decimal("15.0")

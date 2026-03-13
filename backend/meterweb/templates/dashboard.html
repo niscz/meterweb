@@ -10,6 +10,7 @@
         <input name="name" class="form-control mb-2" required />
         <button class="btn btn-primary">Create</button>
       </form>
+      {% if building_error %}<div class="alert alert-warning mt-2">{{ building_error }}</div>{% endif %}
       <ul class="mt-2">{% for b in buildings %}<li>{{ b.name }}</li>{% endfor %}</ul>
     </div>
   </div>

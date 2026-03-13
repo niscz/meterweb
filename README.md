@@ -1,15 +1,3 @@
-**Bright Sky** ist ein freies Open-Source-JSON-API für DWD-Wetterdaten, insbesondere Beobachtungen aus dem DWD-Stationsnetz und Vorhersagen aus MOSMIX; die öffentliche Instanz ist ohne API-Key nutzbar. Die Beispielantworten enthalten Stationsmetadaten wie Stationsname, DWD-Station-ID, Koordinaten und Distanz. Seit Bright Sky 2.x versteht der Maintainer das Projekt primär als **Service**, nicht als Python-Bibliothek. Für meterweb heißt das: Bright Sky per HTTP anbinden, lokal cachen, aber nicht in den Core „hineinimportieren“, als wäre es eine Embedded-Library. ([GitHub][1])
-
-**Tabler v1.4.0** ist auf der Release-Seite als aktuelle Release markiert, basiert auf Bootstrap 5, ist responsive, bringt Dark Mode mit und steht unter MIT-Lizenz. Die Release-Hinweise zu 1.4.0 nennen außerdem ein Update auf Bootstrap 5.3.7. Das passt sehr gut zu einem Mobile-First-Admin-Frontend ohne SPA-Overkill. ([GitHub][2])
-
-Der eine Stolperstein mit Charme eines offenstehenden Kanalschachts ist **ApexCharts**: Stand 2026 läuft das Projekt unter einem Dual-License-Modell; die freie Community-Lizenz ist an die Größenklasse der nutzenden Organisation gebunden, und Redistribution an Dritte kann eine OEM-Lizenz erfordern. Zusätzlich liegen manche Zusatzprodukte wie Sankey nicht einfach im Kern der freien Standardbibliothek. Deshalb muss der Agent die Chart-Schicht strikt kapseln: ApexCharts als Default-Renderer für Standardcharts, aber mit austauschbarer Adapter-Schicht und ohne Business-Logik-Kopplung an Apex-spezifische APIs. ([ApexCharts.js][3])
-
-Für **Deutschland** ist Bright Sky der native Happy Path. Weil die Datenbasis DWD-zentriert ist und DWD seine offenen Klima-/Stationsdaten primär über DWD-Stationen, Partnernetze sowie Deutschland-/Europa-Datensätze organisiert, muss meterweb für **DACH** eine austauschbare Weather-Provider-Schnittstelle bekommen. Deutschland ist also First-Class-Citizen, Österreich/Schweiz Best-Effort über dieselbe Abstraktion – nicht per Hardcoding und Hoffen. ([GitHub][1])
-
----
-
-# 1) Kopierbarer Auftrag für den LLM-Coding-Agenten
-
 ```text
 Du bist der leitende Coding-Agent für das Projekt „meterweb“.
 

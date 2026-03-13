@@ -1,7 +1,9 @@
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import Response
 
 from meterweb.application.dto import (
     BuildingCreateDTO,
@@ -15,9 +17,11 @@ from meterweb.application.use_cases import (
     CreateBuildingUseCase,
     CreateMeterPointUseCase,
     CreateUnitUseCase,
+    ExportUseCase,
     ListBuildingsUseCase,
     ListMeterPointsUseCase,
     ListUnitsUseCase,
+    WeatherSyncUseCase,
 )
 from meterweb.interfaces.http.common import require_auth
 from meterweb.interfaces.http.dependencies import (
@@ -26,9 +30,11 @@ from meterweb.interfaces.http.dependencies import (
     get_create_building_use_case,
     get_create_meter_point_use_case,
     get_create_unit_use_case,
+    get_export_use_case,
     get_list_buildings_use_case,
     get_list_meter_points_use_case,
     get_list_units_use_case,
+    get_weather_sync_use_case,
 )
 from meterweb.interfaces.http.schemas import (
     AnalyticsResponse,
@@ -104,3 +110,57 @@ def analytics(request: Request, meter_point_id: UUID, price_per_unit: Decimal = 
     require_auth(request)
     data = use_case.execute(meter_point_id, price_per_unit)
     return AnalyticsResponse(meter_point_id=data.meter_point_id, consumption=data.consumption, cost=data.cost)
+
+
+@router.post("/export/csv")
+def export_csv(request: Request, meter_point_id: UUID, use_case: ExportUseCase = Depends(get_export_use_case)):
+    require_auth(request)
+    return Response(content=use_case.export_csv(meter_point_id), media_type="text/csv")
+
+
+@router.post("/export/xlsx")
+def export_xlsx(request: Request, meter_point_id: UUID, use_case: ExportUseCase = Depends(get_export_use_case)):
+    require_auth(request)
+    return Response(content=use_case.export_xlsx(meter_point_id), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@router.post("/export/pdf")
+def export_pdf(request: Request, meter_point_id: UUID, use_case: ExportUseCase = Depends(get_export_use_case)):
+    require_auth(request)
+    return Response(content=use_case.export_pdf(meter_point_id), media_type="application/pdf")
+
+
+@router.get("/weather/buildings/{building_id}/station")
+def get_station(request: Request, building_id: UUID, lat: float, lon: float, use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case)):
+    require_auth(request)
+    return {"station_id": use_case.select_station(building_id, lat, lon)}
+
+
+@router.post("/weather/buildings/{building_id}/station/auto")
+def set_station_auto(request: Request, building_id: UUID, use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case)):
+    require_auth(request)
+    use_case.set_auto_station(building_id)
+    return {"status": "ok"}
+
+
+@router.post("/weather/buildings/{building_id}/station/manual")
+def set_station_manual(request: Request, building_id: UUID, station_id: str, use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case)):
+    require_auth(request)
+    use_case.set_manual_station(building_id, station_id)
+    return {"status": "ok"}
+
+
+@router.get("/weather/buildings/{building_id}/series")
+def weather_series(
+    request: Request,
+    building_id: UUID,
+    lat: float,
+    lon: float,
+    start_date: date,
+    end_date: date,
+    resolution: str = "daily",
+    use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case),
+):
+    require_auth(request)
+    points = use_case.get_series(building_id, lat, lon, start_date, end_date, resolution)
+    return [{"timestamp": p.timestamp, "temperature_c": p.temperature_c, "cloud_cover_percent": p.cloud_cover_percent} for p in points]

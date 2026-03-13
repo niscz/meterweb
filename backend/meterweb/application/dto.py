@@ -35,6 +35,26 @@ class ReadingCreateDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class PhotoReadingCreateDTO:
+    meter_point_id: UUID
+    measured_at: datetime
+    image_path: str
+
+
+@dataclass(frozen=True, slots=True)
+class OCRCandidateDTO:
+    value: Decimal
+    confidence: float
+
+
+@dataclass(frozen=True, slots=True)
+class OCRRunResultDTO:
+    text: str
+    candidates: list[OCRCandidateDTO]
+    best_candidate: OCRCandidateDTO | None
+
+
+@dataclass(frozen=True, slots=True)
 class BuildingViewDTO:
     id: UUID
     name: str

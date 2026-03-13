@@ -102,6 +102,10 @@ def get_export_use_case(
 
 
 def get_weather_sync_use_case(weather_provider: WeatherProvider = Depends(get_weather_provider)) -> WeatherSyncUseCase:
+    return build_weather_sync_use_case(weather_provider)
+
+
+def build_weather_sync_use_case(weather_provider: WeatherProvider) -> WeatherSyncUseCase:
     station_repository = JsonWeatherStationRepository(Path("/data/weather_station_overrides.json"))
     return WeatherSyncUseCase(weather_provider, station_repository)
 

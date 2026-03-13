@@ -1,5 +1,8 @@
-from datetime import datetime, timezone
+import re
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from meterweb.application.dto import (
@@ -9,6 +12,9 @@ from meterweb.application.dto import (
     LoginDTO,
     MeterPointCreateDTO,
     MeterPointViewDTO,
+    OCRCandidateDTO,
+    OCRRunResultDTO,
+    PhotoReadingCreateDTO,
     ReadingCreateDTO,
     ReadingViewDTO,
     UnitCreateDTO,
@@ -18,20 +24,31 @@ from meterweb.application.ports import (
     Authenticator,
     BuildingRepository,
     MeterPointRepository,
+    OCRProvider,
     ReadingRepository,
+    ReportRenderer,
     UnitRepository,
+    WeatherProvider,
+    WeatherSeriesPoint,
+    WeatherStationRepository,
 )
 from meterweb.domain.auth import Credentials, User
 from meterweb.domain.building import Building, BuildingDomainService, BuildingName
 from meterweb.domain.metering import (
+    IntervalSample,
     MeterPoint,
     Unit,
-    IntervalSample,
     aggregate_intervals,
     consumption_from_absolute_readings,
     consumption_from_pulses,
     evaluate_plausibility,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ReadingPlausibilityResult:
+    plausible: bool
+    warning: str | None
 
 
 class LoginUseCase:
@@ -119,32 +136,152 @@ class AddReadingUseCase:
         if measured_at.tzinfo is None:
             measured_at = measured_at.replace(tzinfo=timezone.utc)
         created = self._repository.add_manual(data.meter_point_id, measured_at, data.value)
-        readings = self._repository.list_for_meter_point(data.meter_point_id)
-
-        plausible = True
-        if len(readings) >= 2:
-            previous = readings[-2]
-            current = readings[-1]
-            deltas = [
-                next_reading.value - prev_reading.value
-                for prev_reading, next_reading in zip(readings, readings[1:])
-                if next_reading.value >= prev_reading.value
-            ]
-            plausibility = evaluate_plausibility(
-                previous.value,
-                current.value,
-                historical_deltas=deltas[:-1] if deltas else [],
-                max_expected_delta=Decimal("50000"),
-                standstill_tolerance=Decimal("0.001"),
-            )
-            plausible = plausibility.is_plausible
+        plausibility = evaluate_reading_plausibility(self._repository, data.meter_point_id, ocr_confidence=None)
         return ReadingViewDTO(
             id=created.id,
             meter_point_id=data.meter_point_id,
             measured_at=created.measured_at,
             value=created.value,
-            plausible=plausible,
+            plausible=plausibility.plausible,
         )
+
+
+class OCRRunUseCase:
+    def __init__(self, provider: OCRProvider) -> None:
+        self._provider = provider
+
+    def execute(self, image_path: Path) -> OCRRunResultDTO:
+        result = self._provider.extract_text(image_path)
+        candidates: list[OCRCandidateDTO] = []
+        for token in re.findall(r"\d+(?:[\.,]\d+)?", result.text):
+            normalized = token.replace(",", ".")
+            try:
+                candidates.append(OCRCandidateDTO(value=Decimal(normalized), confidence=result.confidence))
+            except Exception:
+                continue
+        best_candidate = max(candidates, key=lambda c: c.confidence, default=None)
+        return OCRRunResultDTO(text=result.text, candidates=candidates, best_candidate=best_candidate)
+
+
+class AddPhotoReadingUseCase:
+    def __init__(self, repository: ReadingRepository, ocr_use_case: OCRRunUseCase) -> None:
+        self._repository = repository
+        self._ocr_use_case = ocr_use_case
+
+    def execute(self, data: PhotoReadingCreateDTO, confirmed_value: Decimal | None = None) -> tuple[ReadingViewDTO, OCRRunResultDTO, ReadingPlausibilityResult]:
+        measured_at = data.measured_at
+        if measured_at.tzinfo is None:
+            measured_at = measured_at.replace(tzinfo=timezone.utc)
+        ocr_result = self._ocr_use_case.execute(Path(data.image_path))
+        value = confirmed_value if confirmed_value is not None else (ocr_result.best_candidate.value if ocr_result.best_candidate else None)
+        if value is None:
+            raise ValueError("Kein OCR-Kandidat erkannt. Bitte Wert manuell bestätigen.")
+        ocr_confidence = ocr_result.best_candidate.confidence if ocr_result.best_candidate else 0.0
+        created = self._repository.add_photo(data.meter_point_id, measured_at, value, data.image_path, ocr_confidence)
+        plausibility = evaluate_reading_plausibility(self._repository, data.meter_point_id, ocr_confidence=ocr_confidence)
+        return (
+            ReadingViewDTO(
+                id=created.id,
+                meter_point_id=data.meter_point_id,
+                measured_at=created.measured_at,
+                value=created.value,
+                plausible=plausibility.plausible,
+            ),
+            ocr_result,
+            plausibility,
+        )
+
+
+class ExportUseCase:
+    def __init__(self, reading_repository: ReadingRepository, report_renderer: ReportRenderer) -> None:
+        self._reading_repository = reading_repository
+        self._report_renderer = report_renderer
+
+    def monthly_rows(self, meter_point_id: UUID) -> list[dict[str, str]]:
+        readings = self._reading_repository.list_for_meter_point(meter_point_id)
+        grouped: dict[str, list] = {}
+        for reading in readings:
+            key = reading.measured_at.strftime("%Y-%m")
+            grouped.setdefault(key, []).append(reading)
+
+        rows: list[dict[str, str]] = []
+        for month, month_readings in sorted(grouped.items()):
+            consumption = Decimal("0")
+            ordered = sorted(month_readings, key=lambda r: r.measured_at)
+            for prev, current in zip(ordered, ordered[1:]):
+                try:
+                    consumption += consumption_from_absolute_readings(prev.value, current.value)
+                except ValueError:
+                    continue
+            rows.append({"month": month, "readings": str(len(month_readings)), "consumption": str(consumption)})
+        return rows
+
+    def export_csv(self, meter_point_id: UUID) -> bytes:
+        return self._report_renderer.render_csv(self.monthly_rows(meter_point_id))
+
+    def export_xlsx(self, meter_point_id: UUID) -> bytes:
+        return self._report_renderer.render_xlsx(self.monthly_rows(meter_point_id))
+
+    def export_pdf(self, meter_point_id: UUID) -> bytes:
+        rows = self.monthly_rows(meter_point_id)
+        html = "<h1>Monatsbericht</h1><table><tr><th>Monat</th><th>Ablesungen</th><th>Verbrauch</th></tr>"
+        for row in rows:
+            html += f"<tr><td>{row['month']}</td><td>{row['readings']}</td><td>{row['consumption']}</td></tr>"
+        html += "</table>"
+        return self._report_renderer.render_pdf(html)
+
+
+class WeatherSyncUseCase:
+    def __init__(self, weather_provider: WeatherProvider, station_repository: WeatherStationRepository) -> None:
+        self._weather_provider = weather_provider
+        self._station_repository = station_repository
+
+    def select_station(self, building_id: UUID, latitude: float, longitude: float, force_auto: bool = False) -> str:
+        override = None if force_auto else self._station_repository.get_override(building_id)
+        station = override or self._weather_provider.find_station(latitude, longitude)
+        return station
+
+    def set_manual_station(self, building_id: UUID, station_id: str) -> None:
+        self._station_repository.set_override(building_id, station_id)
+
+    def set_auto_station(self, building_id: UUID) -> None:
+        self._station_repository.set_override(building_id, None)
+
+    def get_series(
+        self,
+        building_id: UUID,
+        latitude: float,
+        longitude: float,
+        start_date: date,
+        end_date: date,
+        resolution: str,
+    ) -> list[WeatherSeriesPoint]:
+        station = self.select_station(building_id, latitude, longitude)
+        return self._weather_provider.get_series(latitude, longitude, start_date, end_date, resolution, station_id=station)
+
+
+def evaluate_reading_plausibility(repository: ReadingRepository, meter_point_id: UUID, ocr_confidence: float | None) -> ReadingPlausibilityResult:
+    readings = repository.list_for_meter_point(meter_point_id)
+    if len(readings) < 2:
+        return ReadingPlausibilityResult(plausible=True, warning=None)
+    previous = readings[-2]
+    current = readings[-1]
+    deltas = [
+        next_reading.value - prev_reading.value
+        for prev_reading, next_reading in zip(readings, readings[1:])
+        if next_reading.value >= prev_reading.value
+    ]
+    plausibility = evaluate_plausibility(
+        previous.value,
+        current.value,
+        historical_deltas=deltas[:-1] if deltas else [],
+        max_expected_delta=Decimal("50000"),
+        standstill_tolerance=Decimal("0.001"),
+    )
+    warning = None
+    if ocr_confidence is not None and ocr_confidence < 0.55:
+        warning = "OCR confidence is low"
+    return ReadingPlausibilityResult(plausible=plausibility.is_plausible and warning is None, warning=warning)
 
 
 class ProcessAbsoluteReadingUseCase:

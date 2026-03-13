@@ -31,7 +31,7 @@
         <input name="name" class="form-control mb-2" placeholder="Meter point" required />
         <button class="btn btn-primary">Create</button>
       </form>
-      <ul class="mt-2">{% for m in meter_points %}<li>{{ m.name }}</li>{% endfor %}</ul>
+      <ul class="mt-2">{% for m in meter_points %}<li>{{ m.name }} - <a href="/reports/monthly/{{ m.id }}">Monatsbericht</a></li>{% endfor %}</ul>
     </div>
   </div>
 </div>
@@ -44,6 +44,16 @@
     <div class="col-md-3"><input class="form-control" type="number" step="0.001" name="value" required /></div>
     <div class="col-md-2"><button class="btn btn-success w-100">Save</button></div>
   </form>
+
+  <h2 class="h4 mt-3">Foto/OCR Capture</h2>
+  <form method="post" action="/dashboard/readings/photo" enctype="multipart/form-data" class="row g-2">
+    <div class="col-md-3"><select class="form-select" name="meter_point_id">{% for m in meter_points %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><input class="form-control" type="datetime-local" name="measured_at" required /></div>
+    <div class="col-md-2"><input class="form-control" type="number" step="0.001" name="value" placeholder="Optional override" /></div>
+    <div class="col-md-2"><input class="form-control" type="file" accept="image/*" name="photo" required /></div>
+    <div class="col-md-2"><button class="btn btn-primary w-100">Upload + OCR</button></div>
+  </form>
+
   {% if reading_error %}<div class="alert alert-warning mt-2">{{ reading_error }}</div>{% endif %}
   {% if analytics %}
   <div class="alert alert-info mt-2">

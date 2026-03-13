@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Monatsbericht | meterweb{% endblock %}
+{% block content %}
+<h1 class="h2">Monatsbericht je Objekt</h1>
+<table class="table table-striped">
+  <thead><tr><th>Monat</th><th>Ablesungen</th><th>Verbrauch</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+      <tr><td>{{ row.month }}</td><td>{{ row.readings }}</td><td>{{ row.consumption }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="d-flex gap-2">
+  <a class="btn btn-outline-primary" href="/exports/csv/{{ meter_point_id }}">CSV</a>
+  <a class="btn btn-outline-primary" href="/exports/xlsx/{{ meter_point_id }}">XLSX</a>
+  <a class="btn btn-outline-primary" href="/exports/pdf/{{ meter_point_id }}">PDF</a>
+</div>
+{% endblock %}

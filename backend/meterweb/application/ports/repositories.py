@@ -43,5 +43,19 @@ class ReadingRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def add_photo(self, meter_point_id: UUID, measured_at: datetime, value: Decimal, image_path: str, ocr_confidence: float) -> Reading:
+        raise NotImplementedError
+
+    @abstractmethod
     def list_for_meter_point(self, meter_point_id: UUID) -> list[Reading]:
+        raise NotImplementedError
+
+
+class WeatherStationRepository(ABC):
+    @abstractmethod
+    def get_override(self, building_id: UUID) -> str | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_override(self, building_id: UUID, station_id: str | None) -> None:
         raise NotImplementedError

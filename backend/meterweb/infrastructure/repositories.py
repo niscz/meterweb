@@ -1,11 +1,13 @@
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from meterweb.application.ports import BuildingRepository, MeterPointRepository, ReadingRepository, UnitRepository
+from meterweb.application.ports import BuildingRepository, MeterPointRepository, ReadingRepository, UnitRepository, WeatherStationRepository
 from meterweb.domain.building import Building, BuildingName
 from meterweb.domain.metering import MeterPoint, Reading, Unit
 from meterweb.infrastructure.sqlalchemy_models import (
@@ -81,6 +83,13 @@ class SqlAlchemyReadingRepository(ReadingRepository):
         self._session = session
 
     def add_manual(self, meter_point_id: UUID, measured_at: datetime, value: Decimal) -> Reading:
+        return self._add_reading(meter_point_id, measured_at, value, source="manual")
+
+    def add_photo(self, meter_point_id: UUID, measured_at: datetime, value: Decimal, image_path: str, ocr_confidence: float) -> Reading:
+        del image_path, ocr_confidence
+        return self._add_reading(meter_point_id, measured_at, value, source="photo")
+
+    def _add_reading(self, meter_point_id: UUID, measured_at: datetime, value: Decimal, source: str) -> Reading:
         register_id = self._session.scalar(
             select(MeterRegisterRecord.id)
             .join(MeterDeviceRecord, MeterRegisterRecord.meter_device_id == MeterDeviceRecord.id)
@@ -96,7 +105,7 @@ class SqlAlchemyReadingRepository(ReadingRepository):
                 meter_register_id=register_id,
                 measured_at=reading.measured_at,
                 value=reading.value,
-                source="manual",
+                source=source,
             )
         )
         self._session.commit()
@@ -111,3 +120,26 @@ class SqlAlchemyReadingRepository(ReadingRepository):
             .order_by(ReadingRecord.measured_at)
         ).all()
         return [Reading(id=UUID(r.id), meter_register_id=UUID(r.meter_register_id), measured_at=r.measured_at, value=r.value) for r in rows]
+
+
+class JsonWeatherStationRepository(WeatherStationRepository):
+    def __init__(self, storage_file: Path) -> None:
+        self._storage_file = storage_file
+        self._storage_file.parent.mkdir(parents=True, exist_ok=True)
+
+    def get_override(self, building_id: UUID) -> str | None:
+        payload = self._load()
+        return payload.get(str(building_id))
+
+    def set_override(self, building_id: UUID, station_id: str | None) -> None:
+        payload = self._load()
+        if station_id is None:
+            payload.pop(str(building_id), None)
+        else:
+            payload[str(building_id)] = station_id
+        self._storage_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    def _load(self) -> dict[str, str]:
+        if not self._storage_file.exists():
+            return {}
+        return json.loads(self._storage_file.read_text(encoding="utf-8"))

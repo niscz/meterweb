@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import os
+import re
 import secrets
 from pathlib import Path
 
@@ -11,6 +12,19 @@ from meterweb.domain.auth import AuthenticationError, Credentials, User
 MIN_ADMIN_USERNAME_LENGTH = 3
 MIN_ADMIN_PASSWORD_LENGTH = 12
 MIN_SECRET_KEY_LENGTH = 32
+PASSWORD_COMPLEXITY_PATTERN = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$")
+SECRET_KEY_COMPLEXITY_PATTERN = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$")
+PLACEHOLDER_TOKENS = (
+    "changeme",
+    "change-me",
+    "replace",
+    "placeholder",
+    "example",
+    "set-me",
+    "set_me",
+    "please-change",
+    "default",
+)
 PBKDF2_ITERATIONS = 600_000
 SALT_BYTES = 16
 
@@ -18,7 +32,15 @@ SALT_BYTES = 16
 class EnvAuthenticator(Authenticator):
     def __init__(self) -> None:
         self._username = _require_env("ADMIN_USERNAME", min_length=MIN_ADMIN_USERNAME_LENGTH)
+        _require_not_placeholder("ADMIN_USERNAME", self._username)
+
         admin_password = _require_env("ADMIN_PASSWORD", min_length=MIN_ADMIN_PASSWORD_LENGTH)
+        _require_not_placeholder("ADMIN_PASSWORD", admin_password)
+        if not PASSWORD_COMPLEXITY_PATTERN.match(admin_password):
+            raise RuntimeError(
+                "Environment variable ADMIN_PASSWORD must include at least one lowercase letter, "
+                "one uppercase letter, one digit, and one special character"
+            )
 
         hash_file = Path(os.getenv("ADMIN_PASSWORD_HASH_FILE", ".meterweb_admin_password.hash"))
         self._password_hash = _load_or_initialize_password_hash(hash_file, admin_password)
@@ -32,11 +54,13 @@ class EnvAuthenticator(Authenticator):
 
 
 def validate_runtime_security_config() -> str:
-    secret_key = os.getenv("SECRET_KEY")
-    if secret_key is None:
-        raise RuntimeError("Missing required environment variable: SECRET_KEY")
-    if len(secret_key) < MIN_SECRET_KEY_LENGTH:
-        raise RuntimeError(f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters long")
+    secret_key = _require_env("SECRET_KEY", min_length=MIN_SECRET_KEY_LENGTH)
+    _require_not_placeholder("SECRET_KEY", secret_key)
+    if not SECRET_KEY_COMPLEXITY_PATTERN.match(secret_key):
+        raise RuntimeError(
+            "Environment variable SECRET_KEY must include at least one lowercase letter, "
+            "one uppercase letter, one digit, and one special character"
+        )
 
     EnvAuthenticator()
     return secret_key
@@ -49,6 +73,18 @@ def _require_env(name: str, *, min_length: int) -> str:
     if len(value) < min_length:
         raise RuntimeError(f"Environment variable {name} must be at least {min_length} characters long")
     return value
+
+
+def _require_not_placeholder(name: str, value: str) -> None:
+    normalized = value.strip().lower()
+    if normalized in {"admin", "please-change-me"}:
+        raise RuntimeError(f"Environment variable {name} uses an insecure default value")
+
+    if "<" in value or ">" in value or "__" in value:
+        raise RuntimeError(f"Environment variable {name} appears to be an unreplaced placeholder value")
+
+    if any(token in normalized for token in PLACEHOLDER_TOKENS):
+        raise RuntimeError(f"Environment variable {name} appears to be an unreplaced placeholder value")
 
 
 def _load_or_initialize_password_hash(hash_file: Path, admin_password: str) -> str:

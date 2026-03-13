@@ -23,9 +23,9 @@ uvicorn meterweb.main:app --reload
 
 Die Anwendung startet nur, wenn folgende Umgebungsvariablen gesetzt und stark genug sind:
 
-- `SECRET_KEY` (mindestens 32 Zeichen)
-- `ADMIN_USERNAME` (mindestens 3 Zeichen)
-- `ADMIN_PASSWORD` (mindestens 12 Zeichen)
+- `SECRET_KEY` (mindestens 32 Zeichen sowie Klein-/Großbuchstabe, Zahl, Sonderzeichen; keine Platzhalterwerte)
+- `ADMIN_USERNAME` (mindestens 3 Zeichen; kein Standardwert wie `admin`; keine Platzhalterwerte)
+- `ADMIN_PASSWORD` (mindestens 12 Zeichen sowie Klein-/Großbuchstabe, Zahl, Sonderzeichen; keine Platzhalterwerte)
 
 Zusätzliche optionale Session-Konfiguration:
 

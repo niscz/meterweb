@@ -1,7 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request
 
 from meterweb.application.dto import (
     BuildingCreateDTO,
@@ -54,10 +54,7 @@ def list_buildings(request: Request, use_case: ListBuildingsUseCase = Depends(ge
 @router.post("/buildings", response_model=BuildingResponse)
 def create_building(request: Request, payload: BuildingCreateRequest, use_case: CreateBuildingUseCase = Depends(get_create_building_use_case)):
     require_auth(request)
-    try:
-        created = use_case.execute(BuildingCreateDTO(name=payload.name))
-    except ValueError as err:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
+    created = use_case.execute(BuildingCreateDTO(name=payload.name))
     return BuildingResponse(id=str(created.id), name=created.name)
 
 
@@ -70,10 +67,7 @@ def list_units(request: Request, use_case: ListUnitsUseCase = Depends(get_list_u
 @router.post("/units", response_model=UnitResponse)
 def create_unit(request: Request, payload: UnitCreateRequest, use_case: CreateUnitUseCase = Depends(get_create_unit_use_case)):
     require_auth(request)
-    try:
-        created = use_case.execute(UnitCreateDTO(building_id=UUID(payload.building_id), name=payload.name))
-    except ValueError as err:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
+    created = use_case.execute(UnitCreateDTO(building_id=payload.building_id, name=payload.name))
     return UnitResponse(id=str(created.id), building_id=str(created.building_id), name=created.name)
 
 
@@ -86,7 +80,7 @@ def list_meter_points(request: Request, use_case: ListMeterPointsUseCase = Depen
 @router.post("/meter-points", response_model=MeterPointResponse)
 def create_meter_point(request: Request, payload: MeterPointCreateRequest, use_case: CreateMeterPointUseCase = Depends(get_create_meter_point_use_case)):
     require_auth(request)
-    created = use_case.execute(MeterPointCreateDTO(unit_id=UUID(payload.unit_id), name=payload.name))
+    created = use_case.execute(MeterPointCreateDTO(unit_id=payload.unit_id, name=payload.name))
     return MeterPointResponse(id=str(created.id), unit_id=str(created.unit_id), name=created.name)
 
 
@@ -94,7 +88,7 @@ def create_meter_point(request: Request, payload: MeterPointCreateRequest, use_c
 def add_reading(request: Request, payload: ReadingCreateRequest, use_case: AddReadingUseCase = Depends(get_add_reading_use_case)):
     require_auth(request)
     created = use_case.execute(
-        ReadingCreateDTO(meter_point_id=UUID(payload.meter_point_id), measured_at=payload.measured_at, value=payload.value)
+        ReadingCreateDTO(meter_point_id=payload.meter_point_id, measured_at=payload.measured_at, value=payload.value)
     )
     return ReadingResponse(
         id=str(created.id),
@@ -106,7 +100,7 @@ def add_reading(request: Request, payload: ReadingCreateRequest, use_case: AddRe
 
 
 @router.get("/analytics/{meter_point_id}", response_model=AnalyticsResponse)
-def analytics(request: Request, meter_point_id: str, price_per_unit: Decimal = Decimal("0.35"), use_case: AnalyticsUseCase = Depends(get_analytics_use_case)):
+def analytics(request: Request, meter_point_id: UUID, price_per_unit: Decimal = Decimal("0.35"), use_case: AnalyticsUseCase = Depends(get_analytics_use_case)):
     require_auth(request)
-    data = use_case.execute(UUID(meter_point_id), price_per_unit)
-    return AnalyticsResponse(meter_point_id=str(data.meter_point_id), consumption=data.consumption, cost=data.cost)
+    data = use_case.execute(meter_point_id, price_per_unit)
+    return AnalyticsResponse(meter_point_id=data.meter_point_id, consumption=data.consumption, cost=data.cost)

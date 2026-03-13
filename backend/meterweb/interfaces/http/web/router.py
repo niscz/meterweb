@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -121,14 +121,22 @@ def create_building(
 @router.post("/dashboard/units")
 def create_unit(request: Request, building_id: str = Form(), name: str = Form(), use_case: CreateUnitUseCase = Depends(get_create_unit_use_case)):
     require_auth(request)
-    use_case.execute(UnitCreateDTO(building_id=UUID(building_id), name=name))
+    try:
+        parsed_building_id = UUID(building_id)
+        use_case.execute(UnitCreateDTO(building_id=parsed_building_id, name=name))
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/dashboard/meter-points")
 def create_meter_point(request: Request, unit_id: str = Form(), name: str = Form(), use_case: CreateMeterPointUseCase = Depends(get_create_meter_point_use_case)):
     require_auth(request)
-    use_case.execute(MeterPointCreateDTO(unit_id=UUID(unit_id), name=name))
+    try:
+        parsed_unit_id = UUID(unit_id)
+        use_case.execute(MeterPointCreateDTO(unit_id=parsed_unit_id, name=name))
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -145,14 +153,23 @@ def create_reading(
     list_meter_points: ListMeterPointsUseCase = Depends(get_list_meter_points_use_case),
 ):
     require_auth(request)
-    reading = add_reading_use_case.execute(
-        ReadingCreateDTO(
-            meter_point_id=UUID(meter_point_id),
-            measured_at=datetime.fromisoformat(measured_at),
-            value=Decimal(value),
+    try:
+        parsed_meter_point_id = UUID(meter_point_id)
+        parsed_measured_at = datetime.fromisoformat(measured_at)
+        parsed_value = Decimal(value)
+        if parsed_value <= Decimal("0"):
+            raise ValueError("Zählerstand muss größer als 0 sein.")
+
+        reading = add_reading_use_case.execute(
+            ReadingCreateDTO(
+                meter_point_id=parsed_meter_point_id,
+                measured_at=parsed_measured_at,
+                value=parsed_value,
+            )
         )
-    )
-    analytics = analytics_use_case.execute(UUID(meter_point_id), Decimal("0.35"))
+        analytics = analytics_use_case.execute(parsed_meter_point_id, Decimal("0.35"))
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
     return templates.TemplateResponse(
         request,
         "dashboard.html",

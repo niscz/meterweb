@@ -29,11 +29,19 @@ Die Anwendung startet nur, wenn folgende Umgebungsvariablen gesetzt und stark ge
 
 Zusätzliche optionale Session-Konfiguration:
 
+- `SESSION_HTTPS_ONLY` (Standard: `true`; steuert `https_only` für Session-Cookies)
 - `SESSION_MAX_AGE` (Standard: `3600` Sekunden)
 - `SESSION_COOKIE_PATH` (Standard: `/`)
 - `SESSION_COOKIE_DOMAIN` (optional, für produktive Domains)
 
-Session-Cookies werden mit sicheren Defaults gesetzt (`https_only=True`, `same_site="strict"`, `max_age` gesetzt). In Produktion muss TLS/HTTPS erzwungen sein, da Secure-Cookies sonst vom Browser nicht gesendet werden.
+Session-Cookies werden mit sicheren Defaults gesetzt (`SESSION_HTTPS_ONLY=true`, `same_site="strict"`, `max_age` gesetzt).
+
+Empfohlene Profile:
+
+- **lokal/dev (HTTP erlaubt):** `SESSION_HTTPS_ONLY=false`
+- **Produktion (HTTPS erzwingen):** `SESSION_HTTPS_ONLY=true`
+
+In Produktion muss TLS/HTTPS erzwungen sein, da Secure-Cookies sonst vom Browser nicht gesendet werden.
 
 ## First-Run / Bootstrap-Admin
 

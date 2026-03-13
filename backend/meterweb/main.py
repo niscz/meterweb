@@ -5,6 +5,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from meterweb.infrastructure.auth import validate_runtime_security_config
 from meterweb.infrastructure.db import configure_database, init_db
+from meterweb.interfaces.http.errors import register_exception_handlers
 from meterweb.interfaces.http.router import router
 
 
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
         session_options["domain"] = session_domain
 
     app.add_middleware(SessionMiddleware, **session_options)
+    register_exception_handlers(app)
     app.include_router(router)
 
     @app.on_event("startup")

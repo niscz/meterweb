@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException, status
+from fastapi import status
 from starlette.requests import Request
 
 from meterweb.application.dto import UnitViewDTO
@@ -14,21 +14,19 @@ def _request(path: str) -> Request:
     return Request({"type": "http", "method": "POST", "path": path, "headers": [], "query_string": b"", "session": {}})
 
 
-def test_create_unit_returns_400_for_invalid_uuid(monkeypatch) -> None:
+def test_create_unit_propagates_domain_validation_error(monkeypatch) -> None:
     monkeypatch.setattr(api_router, "require_auth", lambda request: "admin")
 
     class DummyUseCase:
         def execute(self, _data):
-            return UnitViewDTO(id=uuid4(), building_id=uuid4(), name="ignored")
+            raise ValueError("Referenz auf Gebäude unbekannt.")
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ValueError):
         api_router.create_unit(
             request=_request("/api/v1/units"),
-            payload=UnitCreateRequest(building_id="invalid-uuid", name="WEG 1"),
+            payload=UnitCreateRequest(building_id=uuid4(), name="WEG 1"),
             use_case=DummyUseCase(),
         )
-
-    assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_dashboard_create_building_returns_validation_response(monkeypatch) -> None:

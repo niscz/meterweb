@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -14,19 +15,19 @@ class BuildingCreateRequest(BaseModel):
 
 
 class UnitCreateRequest(BaseModel):
-    building_id: str
+    building_id: UUID
     name: str = Field(min_length=1, max_length=255)
 
 
 class MeterPointCreateRequest(BaseModel):
-    unit_id: str
+    unit_id: UUID
     name: str = Field(min_length=1, max_length=255)
 
 
 class ReadingCreateRequest(BaseModel):
-    meter_point_id: str
+    meter_point_id: UUID
     measured_at: datetime
-    value: Decimal
+    value: Decimal = Field(gt=Decimal("0"))
 
 
 class BuildingResponse(BaseModel):
@@ -55,6 +56,6 @@ class ReadingResponse(BaseModel):
 
 
 class AnalyticsResponse(BaseModel):
-    meter_point_id: str
+    meter_point_id: UUID
     consumption: Decimal
     cost: Decimal

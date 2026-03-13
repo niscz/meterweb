@@ -1,0 +1,54 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-please-change-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/meterweb.db}
+      WEATHER_PROVIDER: ${WEATHER_PROVIDER:-brightsky}
+      WEATHER_BASE_URL: ${WEATHER_BASE_URL:-https://api.brightsky.dev}
+      DEFAULT_LOCALE: ${DEFAULT_LOCALE:-de-DE}
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Europe/Berlin}
+    command: >-
+      sh -c "python -m meterweb.bootstrap &&
+             uvicorn meterweb.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - app_data:/data
+      - uploads:/uploads
+      - reports:/reports
+      - backups:/backups
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-please-change-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/meterweb.db}
+      WEATHER_PROVIDER: ${WEATHER_PROVIDER:-brightsky}
+      WEATHER_BASE_URL: ${WEATHER_BASE_URL:-https://api.brightsky.dev}
+      DEFAULT_LOCALE: ${DEFAULT_LOCALE:-de-DE}
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Europe/Berlin}
+    command: >-
+      sh -c "python -m meterweb.bootstrap &&
+             python -m meterweb.worker"
+    volumes:
+      - app_data:/data
+      - uploads:/uploads
+      - reports:/reports
+      - backups:/backups
+    restart: unless-stopped
+
+volumes:
+  app_data:
+  uploads:
+  reports:
+  backups:

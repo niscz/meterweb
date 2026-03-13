@@ -16,7 +16,7 @@ from meterweb.interfaces.http.dependencies import (
 )
 from meterweb.interfaces.http.schemas import (
     BuildingCreateRequest,
-    BuildingResponse
+    BuildingResponse,
 )
 
 templates = Jinja2Templates(directory="meterweb/templates")
@@ -112,5 +112,8 @@ def create_building_api(
     create_use_case: CreateBuildingUseCase = Depends(get_create_building_use_case),
 ):
     _require_auth(request)
-    created = create_use_case.execute(BuildingCreateDTO(name=payload.name))
+    try:
+        created = create_use_case.execute(BuildingCreateDTO(name=payload.name))
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
     return BuildingResponse(id=str(created.id), name=created.name)

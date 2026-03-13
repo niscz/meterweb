@@ -4,9 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      SECRET_KEY: ${SECRET_KEY:-please-change-me}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required and must be set in .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?ADMIN_USERNAME is required and must be set in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required and must be set in .env}
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/meterweb.db}
       WEATHER_PROVIDER: ${WEATHER_PROVIDER:-brightsky}
       WEATHER_BASE_URL: ${WEATHER_BASE_URL:-https://api.brightsky.dev}
@@ -29,9 +29,9 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      SECRET_KEY: ${SECRET_KEY:-please-change-me}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required and must be set in .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?ADMIN_USERNAME is required and must be set in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required and must be set in .env}
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/meterweb.db}
       WEATHER_PROVIDER: ${WEATHER_PROVIDER:-brightsky}
       WEATHER_BASE_URL: ${WEATHER_BASE_URL:-https://api.brightsky.dev}

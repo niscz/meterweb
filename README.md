@@ -57,16 +57,21 @@ cp .env.example .env
 
 ### 2) Sichere Zugangsdaten setzen
 
-Passe in `.env` mindestens diese Werte an:
+Passe in `.env` mindestens diese Werte an (identisch zur Runtime-Validierung):
 
 ```dotenv
-SECRET_KEY=<mindestens-32-zeichen>
+# mindestens 32 Zeichen + Klein-/Großbuchstabe + Zahl + Sonderzeichen
+SECRET_KEY=<dein-starker-secret-key>
+
+# mindestens 3 Zeichen, kein Standardwert wie "admin"
 ADMIN_USERNAME=<dein-admin-user>
-ADMIN_PASSWORD=<mindestens-12-zeichen>
+
+# mindestens 12 Zeichen + Klein-/Großbuchstabe + Zahl + Sonderzeichen
+ADMIN_PASSWORD=<dein-starkes-admin-passwort>
 ```
 
 > [!IMPORTANT]
-> Die Default-Werte in `.env.example` sind nur Platzhalter und **nicht** produktionssicher.
+> Die Werte in `.env.example` sind bewusst ungültige Marker. Ohne Ersetzen startet die App nicht.
 
 ### 3) Starten
 
@@ -75,6 +80,18 @@ docker compose up --build
 ```
 
 Die App ist dann unter **http://localhost:8000** erreichbar.
+
+### 4) Typischer Startfehler & Behebung
+
+Wenn eine Pflichtvariable fehlt/ungültig ist, bricht der Start **explizit** ab, z. B.:
+
+- `Missing required environment variable: SECRET_KEY`
+- `Environment variable ADMIN_PASSWORD must be at least 12 characters long`
+- `Environment variable ADMIN_PASSWORD must include at least one lowercase letter, one uppercase letter, one digit, and one special character`
+- `Environment variable ADMIN_USERNAME uses an insecure default value`
+- `Environment variable SECRET_KEY appears to be an unreplaced placeholder value`
+
+**Behebung:** Entsprechende Variable in `.env` auf einen gültigen, sicheren Wert setzen und `docker compose up --build` erneut ausführen.
 
 ---
 

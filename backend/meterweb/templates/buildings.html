@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Gebäude | meterweb{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h2">Gebäude</h1>
+</div>
+
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="post" action="/buildings" class="row g-2">
+      <div class="col-md-8">
+        <input class="form-control" type="text" name="name" placeholder="Neues Gebäude" required />
+      </div>
+      <div class="col-md-4">
+        <button class="btn btn-primary w-100" type="submit">Gebäude anlegen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <ul class="list-group list-group-flush">
+      {% for building in buildings %}
+      <li class="list-group-item">{{ building.name }}</li>
+      {% else %}
+      <li class="list-group-item text-muted">Noch keine Gebäude vorhanden.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

@@ -136,7 +136,10 @@ class AnalyticsUseCase:
         readings = self._repository.list_for_meter_point(meter_point_id)
         consumption = Decimal("0")
         for prev, current in zip(readings, readings[1:]):
-            consumption += consumption_from_absolute_readings(prev.value, current.value)
+            try:
+                consumption += consumption_from_absolute_readings(prev.value, current.value)
+            except ValueError:
+                continue
         return AnalyticsViewDTO(
             meter_point_id=meter_point_id,
             consumption=consumption,

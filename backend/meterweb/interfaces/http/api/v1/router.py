@@ -70,7 +70,10 @@ def list_units(request: Request, use_case: ListUnitsUseCase = Depends(get_list_u
 @router.post("/units", response_model=UnitResponse)
 def create_unit(request: Request, payload: UnitCreateRequest, use_case: CreateUnitUseCase = Depends(get_create_unit_use_case)):
     require_auth(request)
-    created = use_case.execute(UnitCreateDTO(building_id=UUID(payload.building_id), name=payload.name))
+    try:
+        created = use_case.execute(UnitCreateDTO(building_id=UUID(payload.building_id), name=payload.name))
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
     return UnitResponse(id=str(created.id), building_id=str(created.building_id), name=created.name)
 
 

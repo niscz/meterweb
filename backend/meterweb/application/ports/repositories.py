@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
+from decimal import Decimal
+from uuid import UUID
 
 from meterweb.domain.building import Building
+from meterweb.domain.metering import MeterPoint, Reading, Unit
 
 
 class BuildingRepository(ABC):
@@ -10,4 +14,34 @@ class BuildingRepository(ABC):
 
     @abstractmethod
     def list_all(self) -> list[Building]:
+        raise NotImplementedError
+
+
+class UnitRepository(ABC):
+    @abstractmethod
+    def add(self, unit: Unit) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_all(self) -> list[Unit]:
+        raise NotImplementedError
+
+
+class MeterPointRepository(ABC):
+    @abstractmethod
+    def add(self, meter_point: MeterPoint) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_all(self) -> list[MeterPoint]:
+        raise NotImplementedError
+
+
+class ReadingRepository(ABC):
+    @abstractmethod
+    def add_manual(self, meter_point_id: UUID, measured_at: datetime, value: Decimal) -> Reading:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_for_meter_point(self, meter_point_id: UUID) -> list[Reading]:
         raise NotImplementedError

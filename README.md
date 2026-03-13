@@ -1,4 +1,3 @@
-```text
 Du bist der leitende Coding-Agent für das Projekt „meterweb“.
 
 Deine Aufgabe ist es, eine produktionsreife, selbst gehostete, dockerisierte, Open-Source-Plattform
@@ -139,7 +138,6 @@ Das Projekt ist fertig, wenn ein Nutzer nach `docker compose up` meterweb öffne
 sich einloggen, Gebäude/Einheiten/Zähler anlegen, per Mobilgerät Zählerstände und Fotos
 erfassen, OCR-Vorschläge bestätigen, Verbräuche und Kosten grafisch analysieren,
 witterungsbereinigte Ansichten je Objekt abrufen und Berichte als CSV/XLSX/PDF exportieren kann.
-```
 
 ---
 

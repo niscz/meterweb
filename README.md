@@ -157,8 +157,11 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
+export SESSION_HTTPS_ONLY=false
 uvicorn meterweb.main:app --reload
 ```
+
+Für lokale HTTP-Entwicklung muss `SESSION_HTTPS_ONLY=false` gesetzt sein, damit der Login-Cookie ohne TLS gesendet wird. In Produktion bleibt `SESSION_HTTPS_ONLY=true` (Default), sodass Session-Cookies nur über HTTPS übertragen werden.
 
 ---
 

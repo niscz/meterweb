@@ -9,6 +9,13 @@ from meterweb.interfaces.http.errors import register_exception_handlers
 from meterweb.interfaces.http.router import router
 
 
+def _get_env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def create_app() -> FastAPI:
     configure_database()
 
@@ -19,7 +26,7 @@ def create_app() -> FastAPI:
     session_options = {
         "secret_key": secret_key,
         "same_site": "strict",
-        "https_only": True,
+        "https_only": _get_env_bool("SESSION_HTTPS_ONLY", default=True),
         "max_age": int(os.getenv("SESSION_MAX_AGE", "3600")),
         "path": os.getenv("SESSION_COOKIE_PATH", "/"),
     }

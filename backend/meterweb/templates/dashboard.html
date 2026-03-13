@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | meterweb{% endblock %}
+{% block content %}
+<h1 class="h2 mb-3">{{ 'Master data & metering' if lang == 'en' else 'Stammdaten & Erfassung' }}</h1>
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card card-body">
+      <form method="post" action="/dashboard/buildings">
+        <label class="form-label">{{ 'Building' if lang == 'en' else 'Gebäude' }}</label>
+        <input name="name" class="form-control mb-2" required />
+        <button class="btn btn-primary">Create</button>
+      </form>
+      <ul class="mt-2">{% for b in buildings %}<li>{{ b.name }}</li>{% endfor %}</ul>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card card-body">
+      <form method="post" action="/dashboard/units">
+        <select class="form-select mb-2" name="building_id">{% for b in buildings %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select>
+        <input name="name" class="form-control mb-2" placeholder="Unit" required />
+        <button class="btn btn-primary">Create</button>
+      </form>
+      <ul class="mt-2">{% for u in units %}<li>{{ u.name }}</li>{% endfor %}</ul>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card card-body">
+      <form method="post" action="/dashboard/meter-points">
+        <select class="form-select mb-2" name="unit_id">{% for u in units %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select>
+        <input name="name" class="form-control mb-2" placeholder="Meter point" required />
+        <button class="btn btn-primary">Create</button>
+      </form>
+      <ul class="mt-2">{% for m in meter_points %}<li>{{ m.name }}</li>{% endfor %}</ul>
+    </div>
+  </div>
+</div>
+
+<div class="card card-body mt-3">
+  <h2 class="h4">{{ 'Manual reading' if lang == 'en' else 'Manuelle Ablesung' }}</h2>
+  <form method="post" action="/dashboard/readings" class="row g-2">
+    <div class="col-md-4"><select class="form-select" name="meter_point_id">{% for m in meter_points %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><input class="form-control" type="datetime-local" name="measured_at" required /></div>
+    <div class="col-md-3"><input class="form-control" type="number" step="0.001" name="value" required /></div>
+    <div class="col-md-2"><button class="btn btn-success w-100">Save</button></div>
+  </form>
+  {% if reading_error %}<div class="alert alert-warning mt-2">{{ reading_error }}</div>{% endif %}
+  {% if analytics %}
+  <div class="alert alert-info mt-2">
+    Consumption: {{ analytics.consumption }} kWh | Cost: {{ analytics.cost }} €
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from statistics import median
+from typing import Literal
 from uuid import UUID, uuid4
 
 
@@ -61,6 +62,14 @@ class MeterRegister:
 
 
 @dataclass(frozen=True, slots=True)
+class RegisterTariffBinding:
+    meter_register_id: UUID
+    tariff_code: str
+    valid_from: datetime
+    valid_to: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Reading:
     id: UUID
     meter_register_id: UUID
@@ -76,6 +85,15 @@ class MeterReplacement:
     replaced_at: datetime
     old_device_final_value: Decimal
     new_device_start_value: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class MeterDeviceHistoryEvent:
+    meter_point_id: UUID
+    device_id: UUID
+    event_type: Literal["installed", "removed", "replaced"]
+    occurred_at: datetime
+    note: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +114,24 @@ class RawReading:
 
 
 @dataclass(frozen=True, slots=True)
+class RawPulseReading:
+    meter_register_id: UUID
+    measured_at: datetime
+    pulse_count: int
+    pulse_factor: Decimal
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
+class RawIntervalReading:
+    meter_register_id: UUID
+    start_at: datetime
+    end_at: datetime
+    value: Decimal
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
 class IntervalSample:
     start_at: datetime
     end_at: datetime
@@ -108,6 +144,12 @@ class AggregateConsumption:
     period_start: datetime
     period_end: datetime
     consumption: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class PlausibilityResult:
+    is_plausible: bool
+    flags: tuple[str, ...]
 
 
 def consumption_from_absolute_readings(
@@ -184,3 +226,44 @@ def is_outlier(values: list[Decimal], candidate: Decimal, multiplier: Decimal = 
     lower_bound = q1 - (multiplier * iqr)
     upper_bound = q3 + (multiplier * iqr)
     return candidate < lower_bound or candidate > upper_bound
+
+
+def evaluate_plausibility(
+    previous_value: Decimal,
+    current_value: Decimal,
+    *,
+    historical_deltas: list[Decimal],
+    max_expected_delta: Decimal,
+    standstill_tolerance: Decimal = Decimal("0"),
+    ocr_confidence: Decimal | None = None,
+    ocr_confidence_threshold: Decimal = Decimal("0.70"),
+    weather_expected_range: tuple[Decimal, Decimal] | None = None,
+) -> PlausibilityResult:
+    flags: list[str] = []
+    delta = current_value - previous_value
+
+    if delta < Decimal("0"):
+        flags.append("negative_difference")
+    else:
+        if is_jump(delta, max_expected_delta):
+            flags.append("jump")
+
+        if historical_deltas and is_outlier(historical_deltas, delta):
+            flags.append("outlier")
+
+        if historical_deltas and is_standstill([*historical_deltas[-3:], delta], tolerance=standstill_tolerance):
+            flags.append("standstill")
+
+        if weather_expected_range is not None:
+            low, high = weather_expected_range
+            if delta < low or delta > high:
+                flags.append("weather_conflict")
+
+    if ocr_confidence is not None and ocr_confidence < ocr_confidence_threshold:
+        flags.append("ocr_conflict")
+
+    blocking_flags = {"negative_difference", "jump", "weather_conflict", "ocr_conflict"}
+    return PlausibilityResult(
+        is_plausible=not any(flag in blocking_flags for flag in flags),
+        flags=tuple(flags),
+    )

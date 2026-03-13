@@ -153,14 +153,27 @@ class OCRRunUseCase:
     def execute(self, image_path: Path) -> OCRRunResultDTO:
         result = self._provider.extract_text(image_path)
         candidates: list[OCRCandidateDTO] = []
+        best_score = (-1, -1, Decimal("-1"))
+        best_candidate = None
         for token in re.findall(r"\d+(?:[\.,]\d+)?", result.text):
             normalized = token.replace(",", ".")
             try:
-                candidates.append(OCRCandidateDTO(value=Decimal(normalized), confidence=result.confidence))
+                candidate = OCRCandidateDTO(value=Decimal(normalized), confidence=result.confidence)
             except Exception:
                 continue
-        best_candidate = max(candidates, key=lambda c: c.confidence, default=None)
+            candidates.append(candidate)
+            score = self._candidate_score(candidate)
+            if score > best_score:
+                best_score = score
+                best_candidate = candidate
         return OCRRunResultDTO(text=result.text, candidates=candidates, best_candidate=best_candidate)
+
+    @staticmethod
+    def _candidate_score(candidate: OCRCandidateDTO) -> tuple[int, int, Decimal]:
+        value = candidate.value
+        is_integer = int(value == value.to_integral_value())
+        digit_count = len(value.as_tuple().digits)
+        return is_integer, digit_count, value
 
 
 class AddPhotoReadingUseCase:

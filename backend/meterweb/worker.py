@@ -4,9 +4,12 @@ import logging
 import os
 import time
 from datetime import date, timedelta
+from pathlib import Path
 from uuid import UUID
 
-from meterweb.interfaces.http.dependencies import get_weather_sync_use_case
+from meterweb.infrastructure.providers import ProviderConfig, ProviderFactory
+from meterweb.infrastructure.repositories import JsonWeatherStationRepository
+from meterweb.application.use_cases import WeatherSyncUseCase
 from meterweb.infrastructure.db import configure_database, init_db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -20,7 +23,10 @@ def _sync_weather() -> None:
     if not building_id or not lat or not lon:
         logger.info("Weather sync skipped: WEATHER_BUILDING_ID/WEATHER_LAT/WEATHER_LON not set")
         return
-    use_case = get_weather_sync_use_case()
+    provider_factory = ProviderFactory(ProviderConfig.from_env())
+    weather_provider = provider_factory.create_weather_provider()
+    station_repository = JsonWeatherStationRepository(Path("/data/weather_station_overrides.json"))
+    use_case = WeatherSyncUseCase(weather_provider, station_repository)
     today = date.today()
     start = today - timedelta(days=2)
     use_case.get_series(UUID(building_id), float(lat), float(lon), start, today, "hourly")

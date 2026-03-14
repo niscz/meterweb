@@ -10,6 +10,7 @@ from meterweb.application.use_cases.auth import LoginUseCase
 from meterweb.application.use_cases.buildings import (
     CreateBuildingUseCase,
     CreateMeterPointUseCase,
+    CreateMeterPointWithDefaultDeviceUseCase,
     CreateUnitUseCase,
     ListBuildingsUseCase,
     ListMeterPointsUseCase,
@@ -32,6 +33,7 @@ __all__ = [
     "AnalyticsUseCase",
     "CreateBuildingUseCase",
     "CreateMeterPointUseCase",
+    "CreateMeterPointWithDefaultDeviceUseCase",
     "CreateUnitUseCase",
     "evaluate_reading_plausibility",
     "ExportUseCase",

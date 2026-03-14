@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from meterweb.application.ports import BuildingRepository, MeterPointRepository, ReadingRepository, UnitRepository, WeatherStationRepository
+from meterweb.application.ports.repositories import MeterDeviceRepository, MeterRegisterRepository
 from meterweb.domain.building import Building, BuildingName
 from meterweb.domain.metering import MeterPoint, Reading, Unit
 from meterweb.infrastructure.sqlalchemy_models import (
@@ -26,7 +27,6 @@ class SqlAlchemyBuildingRepository(BuildingRepository):
 
     def add(self, building: Building) -> None:
         self._session.add(BuildingRecord(id=str(building.id), name=building.name.value))
-        self._session.commit()
 
     def list_all(self) -> list[Building]:
         rows = self._session.scalars(select(BuildingRecord).order_by(BuildingRecord.name)).all()
@@ -39,7 +39,6 @@ class SqlAlchemyUnitRepository(UnitRepository):
 
     def add(self, unit: Unit) -> None:
         self._session.add(UnitRecord(id=str(unit.id), building_id=str(unit.building_id), name=unit.name))
-        self._session.commit()
 
     def list_all(self) -> list[Unit]:
         rows = self._session.scalars(select(UnitRecord).order_by(UnitRecord.name)).all()
@@ -52,26 +51,6 @@ class SqlAlchemyMeterPointRepository(MeterPointRepository):
 
     def add(self, meter_point: MeterPoint) -> None:
         self._session.add(MeterPointRecord(id=str(meter_point.id), unit_id=str(meter_point.unit_id), name=meter_point.name))
-        device_id = str(uuid4())
-        self._session.add(
-            MeterDeviceRecord(
-                id=device_id,
-                meter_point_id=str(meter_point.id),
-                serial_number=f"AUTO-{str(meter_point.id)[:8]}",
-                installed_at=datetime.now(timezone.utc),
-                removed_at=None,
-            )
-        )
-        self._session.add(
-            MeterRegisterRecord(
-                id=str(uuid4()),
-                meter_device_id=device_id,
-                code="MAIN",
-                measurement_unit="kWh",
-                rollover_limit=None,
-            )
-        )
-        self._session.commit()
 
     def list_all(self) -> list[MeterPoint]:
         rows = self._session.scalars(select(MeterPointRecord).order_by(MeterPointRecord.name)).all()
@@ -108,7 +87,6 @@ class SqlAlchemyReadingRepository(ReadingRepository):
                 source=source,
             )
         )
-        self._session.commit()
         return reading
 
     def list_for_meter_point(self, meter_point_id: UUID) -> list[Reading]:
@@ -120,6 +98,42 @@ class SqlAlchemyReadingRepository(ReadingRepository):
             .order_by(ReadingRecord.measured_at)
         ).all()
         return [Reading(id=UUID(r.id), meter_register_id=UUID(r.meter_register_id), measured_at=r.measured_at, value=r.value) for r in rows]
+
+
+class SqlAlchemyMeterDeviceRepository(MeterDeviceRepository):
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add_default_for_meter_point(self, meter_point_id: UUID) -> UUID:
+        device_id = uuid4()
+        self._session.add(
+            MeterDeviceRecord(
+                id=str(device_id),
+                meter_point_id=str(meter_point_id),
+                serial_number=f"AUTO-{str(meter_point_id)[:8]}",
+                installed_at=datetime.now(timezone.utc),
+                removed_at=None,
+            )
+        )
+        return device_id
+
+
+class SqlAlchemyMeterRegisterRepository(MeterRegisterRepository):
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add_default_for_device(self, meter_device_id: UUID) -> UUID:
+        register_id = uuid4()
+        self._session.add(
+            MeterRegisterRecord(
+                id=str(register_id),
+                meter_device_id=str(meter_device_id),
+                code="MAIN",
+                measurement_unit="kWh",
+                rollover_limit=None,
+            )
+        )
+        return register_id
 
 
 class JsonWeatherStationRepository(WeatherStationRepository):

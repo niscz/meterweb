@@ -37,6 +37,18 @@ class MeterPointRepository(ABC):
         raise NotImplementedError
 
 
+class MeterDeviceRepository(ABC):
+    @abstractmethod
+    def add_default_for_meter_point(self, meter_point_id: UUID) -> UUID:
+        raise NotImplementedError
+
+
+class MeterRegisterRepository(ABC):
+    @abstractmethod
+    def add_default_for_device(self, meter_device_id: UUID) -> UUID:
+        raise NotImplementedError
+
+
 class ReadingRepository(ABC):
     @abstractmethod
     def add_manual(self, meter_point_id: UUID, measured_at: datetime, value: Decimal) -> Reading:

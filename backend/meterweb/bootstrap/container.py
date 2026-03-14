@@ -6,6 +6,7 @@ from meterweb.application.use_cases.auth import LoginUseCase
 from meterweb.application.use_cases.buildings import (
     CreateBuildingUseCase,
     CreateMeterPointUseCase,
+    CreateMeterPointWithDefaultDeviceUseCase,
     CreateUnitUseCase,
     ListBuildingsUseCase,
     ListMeterPointsUseCase,
@@ -23,6 +24,7 @@ from meterweb.infrastructure.repositories import (
     SqlAlchemyReadingRepository,
     SqlAlchemyUnitRepository,
 )
+from meterweb.infrastructure.uow import SqlAlchemyUnitOfWork
 from meterweb.infrastructure.settings import AppSettings
 
 
@@ -39,6 +41,9 @@ class AppContainer:
         return self._provider_factory
 
     # repository factories
+    def unit_of_work(self, session: Session) -> SqlAlchemyUnitOfWork:
+        return SqlAlchemyUnitOfWork(session)
+
     def building_repository(self, session: Session) -> SqlAlchemyBuildingRepository:
         return SqlAlchemyBuildingRepository(session)
 
@@ -72,31 +77,34 @@ class AppContainer:
         return LoginUseCase(EnvAuthenticator())
 
     def create_building_use_case(self, session: Session) -> CreateBuildingUseCase:
-        return CreateBuildingUseCase(self.building_repository(session))
+        return CreateBuildingUseCase(self.unit_of_work(session))
 
     def list_buildings_use_case(self, session: Session) -> ListBuildingsUseCase:
         return ListBuildingsUseCase(self.building_repository(session))
 
     def create_unit_use_case(self, session: Session) -> CreateUnitUseCase:
-        return CreateUnitUseCase(self.unit_repository(session))
+        return CreateUnitUseCase(self.unit_of_work(session))
 
     def list_units_use_case(self, session: Session) -> ListUnitsUseCase:
         return ListUnitsUseCase(self.unit_repository(session))
 
     def create_meter_point_use_case(self, session: Session) -> CreateMeterPointUseCase:
-        return CreateMeterPointUseCase(self.meter_point_repository(session))
+        return CreateMeterPointUseCase(self.unit_of_work(session))
+
+    def create_meter_point_with_default_device_use_case(self, session: Session) -> CreateMeterPointWithDefaultDeviceUseCase:
+        return CreateMeterPointWithDefaultDeviceUseCase(self.unit_of_work(session))
 
     def list_meter_points_use_case(self, session: Session) -> ListMeterPointsUseCase:
         return ListMeterPointsUseCase(self.meter_point_repository(session))
 
     def add_reading_use_case(self, session: Session) -> AddReadingUseCase:
-        return AddReadingUseCase(self.reading_repository(session))
+        return AddReadingUseCase(self.unit_of_work(session))
 
     def ocr_run_use_case(self) -> OCRRunUseCase:
         return OCRRunUseCase(self.ocr_provider())
 
     def add_photo_reading_use_case(self, session: Session) -> AddPhotoReadingUseCase:
-        return AddPhotoReadingUseCase(self.reading_repository(session), self.ocr_run_use_case())
+        return AddPhotoReadingUseCase(self.unit_of_work(session), self.ocr_run_use_case())
 
     def export_use_case(self, session: Session) -> ExportUseCase:
         return ExportUseCase(self.reading_repository(session), self.report_renderer())

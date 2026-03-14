@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -25,7 +25,7 @@ class MeterPointCreateRequest(BaseModel):
 
 
 class ReadingCreateRequest(BaseModel):
-    meter_point_id: UUID
+    meter_register_id: UUID
     measured_at: datetime
     value: Decimal = Field(gt=Decimal("0"))
 
@@ -35,7 +35,7 @@ class OCRRunRequest(BaseModel):
 
 
 class PhotoReadingCreateRequest(BaseModel):
-    meter_point_id: UUID
+    meter_register_id: UUID
     measured_at: datetime
     image_path: str = Field(min_length=1)
     confirmed_value: Decimal | None = Field(default=None, gt=Decimal("0"))
@@ -53,8 +53,8 @@ class WeatherStationManualRequest(BaseModel):
 class WeatherSeriesRequest(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
-    start_date: datetime
-    end_date: datetime
+    start_date: date
+    end_date: date
     resolution: str = Field(default="daily", min_length=1)
 
 
@@ -89,7 +89,9 @@ class AnalyticsComputeIntervalRequest(BaseModel):
 
 
 class ReportExportRequest(BaseModel):
-    meter_point_id: UUID
+    meter_register_id: UUID | None = None
+    meter_point_id: UUID | None = None
+    building_id: UUID | None = None
 
 
 class OCRCandidateResponse(BaseModel):
@@ -141,14 +143,15 @@ class MeterPointResponse(BaseModel):
 
 class ReadingResponse(BaseModel):
     id: str
-    meter_point_id: str
+    meter_register_id: str
     measured_at: datetime
     value: Decimal
     plausible: bool
 
 
 class AnalyticsResponse(BaseModel):
-    meter_point_id: UUID
+    scope_id: UUID
+    scope: str
     consumption: Decimal
     cost: Decimal
 

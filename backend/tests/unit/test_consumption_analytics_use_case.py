@@ -10,10 +10,13 @@ class FakeReadingRepository:
     def __init__(self, readings: list[Reading]):
         self._readings = readings
 
-    def add_manual(self, meter_point_id, measured_at, value):
-        raise NotImplementedError
+    def list_for_meter_register(self, meter_register_id):
+        return [r for r in self._readings if r.meter_register_id == meter_register_id]
 
-    def list_for_meter_point(self, meter_point_id):
+    def list_for_meter_point(self, _meter_point_id):
+        return self._readings
+
+    def list_for_building(self, _building_id):
         return self._readings
 
 
@@ -26,10 +29,11 @@ def test_analytics_calculates_consumption_and_cost() -> None:
     ]
     use_case = AnalyticsUseCase(FakeReadingRepository(readings))
 
-    result = use_case.execute(uuid4(), Decimal("0.5"))
+    result = use_case.execute_for_meter_register(register_id, Decimal("0.5"))
 
     assert result.consumption == Decimal("30")
     assert result.cost == Decimal("15.0")
+    assert result.scope == "meter_register"
 
 
 def test_analytics_skips_negative_deltas() -> None:
@@ -41,7 +45,25 @@ def test_analytics_skips_negative_deltas() -> None:
     ]
     use_case = AnalyticsUseCase(FakeReadingRepository(readings))
 
-    result = use_case.execute(uuid4(), Decimal("0.5"))
+    result = use_case.execute_for_meter_register(register_id, Decimal("0.5"))
 
     assert result.consumption == Decimal("30")
     assert result.cost == Decimal("15.0")
+
+
+def test_analytics_for_meter_point_groups_interleaved_registers() -> None:
+    ht = uuid4()
+    nt = uuid4()
+    readings = [
+        Reading(id=uuid4(), meter_register_id=ht, measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc), value=Decimal("100")),
+        Reading(id=uuid4(), meter_register_id=nt, measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc), value=Decimal("50")),
+        Reading(id=uuid4(), meter_register_id=ht, measured_at=datetime(2025, 2, 1, tzinfo=timezone.utc), value=Decimal("120")),
+        Reading(id=uuid4(), meter_register_id=nt, measured_at=datetime(2025, 2, 1, tzinfo=timezone.utc), value=Decimal("70")),
+    ]
+    use_case = AnalyticsUseCase(FakeReadingRepository(readings))
+
+    result = use_case.execute_for_meter_point(uuid4(), Decimal("0.5"))
+
+    assert result.consumption == Decimal("40")
+    assert result.cost == Decimal("20.0")
+    assert result.scope == "meter_point"

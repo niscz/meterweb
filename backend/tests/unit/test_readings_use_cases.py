@@ -17,10 +17,10 @@ class _FakeReading:
 
 
 class _FakeReadingRepository:
-    def add_manual(self, _meter_point_id: UUID, measured_at: datetime, value: Decimal) -> _FakeReading:
+    def add_manual(self, _meter_register_id: UUID, measured_at: datetime, value: Decimal) -> _FakeReading:
         return _FakeReading(id=uuid4(), measured_at=measured_at, value=value)
 
-    def add_photo(self, _meter_point_id: UUID, measured_at: datetime, value: Decimal, _image_path: str, _ocr_confidence: float) -> _FakeReading:
+    def add_photo(self, _meter_register_id: UUID, measured_at: datetime, value: Decimal, _image_path: str, _ocr_confidence: float) -> _FakeReading:
         return _FakeReading(id=uuid4(), measured_at=measured_at, value=value)
 
 
@@ -52,7 +52,7 @@ def test_add_reading_commits_before_plausibility(monkeypatch) -> None:
     uow = _FakeUnitOfWork()
     observed: dict[str, str | None] = {"state_before_eval": None}
 
-    def _fake_eval(_repo, _meter_point_id, ocr_confidence=None):
+    def _fake_eval(_repo, _meter_register_id, ocr_confidence=None):
         observed["state_before_eval"] = uow.state[-1] if uow.state else None
         assert ocr_confidence is None
         return SimpleNamespace(plausible=False)
@@ -60,10 +60,10 @@ def test_add_reading_commits_before_plausibility(monkeypatch) -> None:
     monkeypatch.setattr(readings_module, "evaluate_reading_plausibility", _fake_eval)
 
     use_case = AddReadingUseCase(uow)
-    meter_point_id = uuid4()
+    meter_register_id = uuid4()
     result = use_case.execute(
         ReadingCreateDTO(
-            meter_point_id=meter_point_id,
+            meter_register_id=meter_register_id,
             measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
             value=Decimal("42"),
         )
@@ -77,7 +77,7 @@ def test_add_photo_reading_commits_before_plausibility(monkeypatch) -> None:
     uow = _FakeUnitOfWork()
     observed: dict[str, str | None] = {"state_before_eval": None}
 
-    def _fake_eval(_repo, _meter_point_id, ocr_confidence=None):
+    def _fake_eval(_repo, _meter_register_id, ocr_confidence=None):
         observed["state_before_eval"] = uow.state[-1] if uow.state else None
         assert ocr_confidence == 0.9
         return SimpleNamespace(plausible=True, warning=None)
@@ -85,10 +85,10 @@ def test_add_photo_reading_commits_before_plausibility(monkeypatch) -> None:
     monkeypatch.setattr(readings_module, "evaluate_reading_plausibility", _fake_eval)
 
     use_case = AddPhotoReadingUseCase(uow, _FakeOCRRunUseCase())
-    meter_point_id = uuid4()
+    meter_register_id = uuid4()
     result, _ocr_result, plausibility = use_case.execute(
         PhotoReadingCreateDTO(
-            meter_point_id=meter_point_id,
+            meter_register_id=meter_register_id,
             measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
             image_path="/tmp/mock.jpg",
         )

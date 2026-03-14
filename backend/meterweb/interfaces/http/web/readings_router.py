@@ -5,12 +5,15 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
 
 from meterweb.application.dto import PhotoReadingCreateDTO, ReadingCreateDTO
 from meterweb.application.use_cases.analytics import AnalyticsUseCase
 from meterweb.application.use_cases.buildings import ListBuildingsUseCase, ListMeterPointsUseCase, ListUnitsUseCase
 from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, AddReadingUseCase
 from meterweb.bootstrap import get_container
+from meterweb.infrastructure.db import get_session
+from meterweb.infrastructure.repositories import SqlAlchemyReadingRepository
 from meterweb.interfaces.http.common import get_locale, require_auth
 from meterweb.interfaces.http.dependencies import (
     get_add_photo_reading_use_case,
@@ -28,10 +31,22 @@ UPLOAD_DIR = get_container().settings.uploads_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _resolve_register_id(session: Session, meter_register_id: str | None, meter_point_id: str | None) -> UUID:
+    if meter_register_id:
+        return UUID(meter_register_id)
+    if not meter_point_id:
+        raise ValueError("Bitte Messpunkt oder Zählwerk angeben.")
+    register_id = SqlAlchemyReadingRepository(session).get_current_register_for_meter_point(UUID(meter_point_id))
+    if register_id is None:
+        raise ValueError("Messpunkt hat kein aktives Register.")
+    return register_id
+
+
 @router.post("/dashboard/readings")
 def create_reading(
     request: Request,
-    meter_point_id: str = Form(),
+    meter_register_id: str | None = Form(default=None),
+    meter_point_id: str | None = Form(default=None),
     measured_at: str = Form(),
     value: str = Form(),
     add_reading_use_case: AddReadingUseCase = Depends(get_add_reading_use_case),
@@ -39,10 +54,11 @@ def create_reading(
     list_buildings: ListBuildingsUseCase = Depends(get_list_buildings_use_case),
     list_units: ListUnitsUseCase = Depends(get_list_units_use_case),
     list_meter_points: ListMeterPointsUseCase = Depends(get_list_meter_points_use_case),
+    session: Session = Depends(get_session),
 ):
     require_auth(request)
     try:
-        parsed_meter_point_id = UUID(meter_point_id)
+        parsed_meter_register_id = _resolve_register_id(session, meter_register_id, meter_point_id)
         parsed_measured_at = datetime.fromisoformat(measured_at)
         parsed_value = Decimal(value)
         if parsed_value <= Decimal("0"):
@@ -50,12 +66,12 @@ def create_reading(
 
         reading = add_reading_use_case.execute(
             ReadingCreateDTO(
-                meter_point_id=parsed_meter_point_id,
+                meter_register_id=parsed_meter_register_id,
                 measured_at=parsed_measured_at,
                 value=parsed_value,
             )
         )
-        analytics = analytics_use_case.execute(parsed_meter_point_id, Decimal("0.35"))
+        analytics = analytics_use_case.execute(UUID(meter_point_id), Decimal("0.35")) if meter_point_id else None
     except ValueError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
     return templates.TemplateResponse(
@@ -77,15 +93,17 @@ def create_reading(
 @router.post("/dashboard/readings/photo")
 async def create_photo_reading(
     request: Request,
-    meter_point_id: str = Form(),
+    meter_register_id: str | None = Form(default=None),
+    meter_point_id: str | None = Form(default=None),
     measured_at: str = Form(),
     value: str | None = Form(default=None),
     photo: UploadFile = File(),
     add_photo_reading_use_case: AddPhotoReadingUseCase = Depends(get_add_photo_reading_use_case),
     analytics_use_case: AnalyticsUseCase = Depends(get_analytics_use_case),
+    session: Session = Depends(get_session),
 ):
     require_auth(request)
-    parsed_meter_point_id = UUID(meter_point_id)
+    parsed_meter_register_id = _resolve_register_id(session, meter_register_id, meter_point_id)
     parsed_measured_at = datetime.fromisoformat(measured_at)
     suffix = Path(photo.filename or "upload.jpg").suffix or ".jpg"
     file_path = UPLOAD_DIR / f"{uuid4()}{suffix}"
@@ -93,13 +111,13 @@ async def create_photo_reading(
     confirmed_value = Decimal(value) if value else None
     reading, ocr_result, plausibility = add_photo_reading_use_case.execute(
         PhotoReadingCreateDTO(
-            meter_point_id=parsed_meter_point_id,
+            meter_register_id=parsed_meter_register_id,
             measured_at=parsed_measured_at,
             image_path=str(file_path),
         ),
         confirmed_value=confirmed_value,
     )
-    analytics = analytics_use_case.execute(parsed_meter_point_id, Decimal("0.35"))
+    analytics = analytics_use_case.execute(UUID(meter_point_id), Decimal("0.35")) if meter_point_id else None
     return templates.TemplateResponse(
         request,
         "capture_confirm.html",

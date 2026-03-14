@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+
 def _client(tmp_path: Path) -> TestClient:
     from meterweb.main import create_app
 
@@ -28,14 +29,15 @@ def test_masterdata_and_reading_flow(monkeypatch, tmp_path: Path) -> None:
     building = client.post("/api/v1/buildings", json={"name": "Haus A"}).json()
     unit = client.post("/api/v1/units", json={"building_id": building["id"], "name": "WEG 1"}).json()
     meter_point = client.post("/api/v1/meter-points", json={"unit_id": unit["id"], "name": "Strom"}).json()
+    current_register = client.get(f"/api/v1/meter-points/{meter_point['id']}/current-register").json()
 
     first = client.post(
         "/api/v1/readings",
-        json={"meter_point_id": meter_point["id"], "measured_at": "2025-01-01T00:00:00+00:00", "value": "100"},
+        json={"meter_register_id": current_register["meter_register_id"], "measured_at": "2025-01-01T00:00:00+00:00", "value": "100"},
     )
     second = client.post(
         "/api/v1/readings",
-        json={"meter_point_id": meter_point["id"], "measured_at": "2025-02-01T00:00:00+00:00", "value": "140"},
+        json={"meter_register_id": current_register["meter_register_id"], "measured_at": "2025-02-01T00:00:00+00:00", "value": "140"},
     )
 
     assert first.status_code == 200
@@ -60,14 +62,15 @@ def test_reading_plausibility_flags_negative_delta(monkeypatch, tmp_path: Path) 
     building = client.post("/api/v1/buildings", json={"name": "Haus B"}).json()
     unit = client.post("/api/v1/units", json={"building_id": building["id"], "name": "WEG 2"}).json()
     meter_point = client.post("/api/v1/meter-points", json={"unit_id": unit["id"], "name": "Wasser"}).json()
+    current_register = client.get(f"/api/v1/meter-points/{meter_point['id']}/current-register").json()
 
     client.post(
         "/api/v1/readings",
-        json={"meter_point_id": meter_point["id"], "measured_at": "2025-01-01T00:00:00+00:00", "value": "100"},
+        json={"meter_register_id": current_register["meter_register_id"], "measured_at": "2025-01-01T00:00:00+00:00", "value": "100"},
     )
     second = client.post(
         "/api/v1/readings",
-        json={"meter_point_id": meter_point["id"], "measured_at": "2025-02-01T00:00:00+00:00", "value": "90"},
+        json={"meter_register_id": current_register["meter_register_id"], "measured_at": "2025-02-01T00:00:00+00:00", "value": "90"},
     )
 
     assert second.status_code == 200

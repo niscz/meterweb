@@ -43,10 +43,11 @@ def test_negative_or_zero_reading_values_are_rejected_with_422(monkeypatch, tmp_
     building = client.post("/api/v1/buildings", json={"name": "Haus C"}).json()
     unit = client.post("/api/v1/units", json={"building_id": building["id"], "name": "WEG 3"}).json()
     meter_point = client.post("/api/v1/meter-points", json={"unit_id": unit["id"], "name": "Strom"}).json()
+    current_register = client.get(f"/api/v1/meter-points/{meter_point['id']}/current-register").json()
 
     response = client.post(
         "/api/v1/readings",
-        json={"meter_point_id": meter_point["id"], "measured_at": "2025-01-01T00:00:00+00:00", "value": "0"},
+        json={"meter_register_id": current_register["meter_register_id"], "measured_at": "2025-01-01T00:00:00+00:00", "value": "0"},
     )
 
     assert response.status_code == 422
@@ -60,11 +61,11 @@ def test_unknown_reference_returns_400(monkeypatch, tmp_path: Path) -> None:
     response = client.post(
         "/api/v1/readings",
         json={
-            "meter_point_id": str(uuid4()),
+            "meter_register_id": str(uuid4()),
             "measured_at": "2025-01-01T00:00:00+00:00",
             "value": "100",
         },
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Messpunkt hat kein aktives Register."
+    assert response.json()["detail"] == "Zählwerk existiert nicht."

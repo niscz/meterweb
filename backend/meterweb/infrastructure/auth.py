@@ -14,17 +14,19 @@ MIN_ADMIN_PASSWORD_LENGTH = 12
 MIN_SECRET_KEY_LENGTH = 32
 PASSWORD_COMPLEXITY_PATTERN = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$")
 SECRET_KEY_COMPLEXITY_PATTERN = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$")
-PLACEHOLDER_TOKENS = (
+EXACT_PLACEHOLDER_VALUES = {
+    "admin",
     "changeme",
     "change-me",
-    "replace",
-    "placeholder",
-    "example",
+    "please-change-me",
+    "replace-me",
+    "replace_this",
     "set-me",
     "set_me",
-    "please-change",
+    "placeholder",
+    "example",
     "default",
-)
+}
 PBKDF2_ITERATIONS = 600_000
 SALT_BYTES = 16
 
@@ -77,13 +79,13 @@ def _require_env(name: str, *, min_length: int) -> str:
 
 def _require_not_placeholder(name: str, value: str) -> None:
     normalized = value.strip().lower()
-    if normalized in {"admin", "please-change-me"}:
+    if normalized in EXACT_PLACEHOLDER_VALUES:
         raise RuntimeError(f"Environment variable {name} uses an insecure default value")
 
-    if "<" in value or ">" in value or "__" in value:
-        raise RuntimeError(f"Environment variable {name} appears to be an unreplaced placeholder value")
-
-    if any(token in normalized for token in PLACEHOLDER_TOKENS):
+    stripped = value.strip()
+    if (stripped.startswith("<") and stripped.endswith(">")) or (
+        stripped.startswith("__") and stripped.endswith("__")
+    ):
         raise RuntimeError(f"Environment variable {name} appears to be an unreplaced placeholder value")
 
 

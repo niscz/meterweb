@@ -12,7 +12,7 @@ from meterweb.application.use_cases.buildings import (
     ListMeterPointsUseCase,
     ListUnitsUseCase,
 )
-from meterweb.interfaces.http.common import get_locale, require_auth
+from meterweb.interfaces.http.common import enforce_csrf, get_locale, require_auth
 from meterweb.interfaces.http.templating import create_templates
 from meterweb.interfaces.http.dependencies import (
     get_create_building_use_case,
@@ -52,7 +52,7 @@ def dashboard(
     )
 
 
-@router.post("/dashboard/buildings")
+@router.post("/dashboard/buildings", dependencies=[Depends(enforce_csrf)])
 def create_building(
     request: Request,
     name: str = Form(),
@@ -83,7 +83,7 @@ def create_building(
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/dashboard/units")
+@router.post("/dashboard/units", dependencies=[Depends(enforce_csrf)])
 def create_unit(request: Request, building_id: UUID = Form(), name: str = Form(), use_case: CreateUnitUseCase = Depends(get_create_unit_use_case)):
     require_auth(request)
     try:
@@ -93,7 +93,7 @@ def create_unit(request: Request, building_id: UUID = Form(), name: str = Form()
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/dashboard/meter-points")
+@router.post("/dashboard/meter-points", dependencies=[Depends(enforce_csrf)])
 def create_meter_point(request: Request, unit_id: UUID = Form(), name: str = Form(), use_case: CreateMeterPointUseCase = Depends(get_create_meter_point_use_case)):
     require_auth(request)
     try:

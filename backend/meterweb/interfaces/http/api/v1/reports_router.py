@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from meterweb.application.use_cases.exports import ExportUseCase
-from meterweb.interfaces.http.common import get_locale, require_auth
+from meterweb.interfaces.http.common import enforce_csrf, get_locale, require_auth
 from meterweb.interfaces.http.dependencies import get_export_use_case
 from meterweb.interfaces.http.schemas import ReportExportRequest
 
 router = APIRouter(tags=["v1-reports"])
 
 
-@router.post("/reports/monthly")
+@router.post("/reports/monthly", dependencies=[Depends(enforce_csrf)])
 def monthly_rows(
     request: Request,
     payload: ReportExportRequest,
@@ -25,7 +25,7 @@ def monthly_rows(
     raise HTTPException(status_code=422, detail="scope required")
 
 
-@router.post("/reports/export/csv")
+@router.post("/reports/export/csv", dependencies=[Depends(enforce_csrf)])
 def export_csv(
     request: Request,
     payload: ReportExportRequest,
@@ -41,7 +41,7 @@ def export_csv(
     raise HTTPException(status_code=422, detail="scope required")
 
 
-@router.post("/reports/export/xlsx")
+@router.post("/reports/export/xlsx", dependencies=[Depends(enforce_csrf)])
 def export_xlsx(
     request: Request,
     payload: ReportExportRequest,
@@ -57,7 +57,7 @@ def export_xlsx(
     raise HTTPException(status_code=422, detail="scope required")
 
 
-@router.post("/reports/export/pdf")
+@router.post("/reports/export/pdf", dependencies=[Depends(enforce_csrf)])
 def export_pdf(
     request: Request,
     payload: ReportExportRequest,

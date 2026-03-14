@@ -6,7 +6,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
 
 from meterweb.application.use_cases.weather import WeatherSyncUseCase
-from meterweb.interfaces.http.common import require_auth
+from meterweb.interfaces.http.common import enforce_csrf, require_auth
 from meterweb.interfaces.http.dependencies import get_weather_sync_use_case
 from meterweb.interfaces.http.mappers import to_weather_series_item
 from meterweb.interfaces.http.schemas import (
@@ -33,7 +33,7 @@ def get_station(
     return {"station_id": use_case.select_station(building_id, lat, lon)}
 
 
-@router.post("/weather/buildings/{building_id}/station", response_model=WeatherStationResponse)
+@router.post("/weather/buildings/{building_id}/station", response_model=WeatherStationResponse, dependencies=[Depends(enforce_csrf)])
 def get_station_post(
     request: Request,
     building_id: UUID,
@@ -44,14 +44,14 @@ def get_station_post(
     return {"station_id": use_case.select_station(building_id, payload.lat, payload.lon)}
 
 
-@router.post("/weather/buildings/{building_id}/station/auto")
+@router.post("/weather/buildings/{building_id}/station/auto", dependencies=[Depends(enforce_csrf)])
 def set_station_auto(request: Request, building_id: UUID, use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case)):
     require_auth(request)
     use_case.set_auto_station(building_id)
     return {"status": "ok"}
 
 
-@router.post("/weather/buildings/{building_id}/station/manual")
+@router.post("/weather/buildings/{building_id}/station/manual", dependencies=[Depends(enforce_csrf)])
 def set_station_manual(
     request: Request,
     building_id: UUID,
@@ -100,7 +100,7 @@ def weather_series(
     return [to_weather_series_item(point) for point in points]
 
 
-@router.post("/weather/buildings/{building_id}/series")
+@router.post("/weather/buildings/{building_id}/series", dependencies=[Depends(enforce_csrf)])
 def weather_series_post(
     request: Request,
     building_id: UUID,
@@ -119,7 +119,7 @@ def weather_series_post(
     return [to_weather_series_item(point) for point in points]
 
 
-@router.post("/weather/buildings/{building_id}/sync", response_model=WeatherSyncResponse)
+@router.post("/weather/buildings/{building_id}/sync", response_model=WeatherSyncResponse, dependencies=[Depends(enforce_csrf)])
 def sync_weather(
     request: Request,
     building_id: UUID,

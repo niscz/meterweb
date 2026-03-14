@@ -9,7 +9,7 @@ from meterweb.application.use_cases.buildings import (
     ListMeterPointsUseCase,
     ListUnitsUseCase,
 )
-from meterweb.interfaces.http.common import require_auth
+from meterweb.interfaces.http.common import enforce_csrf, require_auth
 from meterweb.interfaces.http.dependencies import (
     get_create_building_use_case,
     get_create_meter_point_use_case,
@@ -37,7 +37,7 @@ def list_buildings(request: Request, use_case: ListBuildingsUseCase = Depends(ge
     return [to_building_response(item) for item in use_case.execute()]
 
 
-@router.post("/buildings", response_model=BuildingResponse)
+@router.post("/buildings", response_model=BuildingResponse, dependencies=[Depends(enforce_csrf)])
 def create_building(request: Request, payload: BuildingCreateRequest, use_case: CreateBuildingUseCase = Depends(get_create_building_use_case)):
     require_auth(request)
     return to_building_response(use_case.execute(BuildingCreateDTO(name=payload.name)))
@@ -49,7 +49,7 @@ def list_units(request: Request, use_case: ListUnitsUseCase = Depends(get_list_u
     return [to_unit_response(item) for item in use_case.execute()]
 
 
-@router.post("/units", response_model=UnitResponse)
+@router.post("/units", response_model=UnitResponse, dependencies=[Depends(enforce_csrf)])
 def create_unit(request: Request, payload: UnitCreateRequest, use_case: CreateUnitUseCase = Depends(get_create_unit_use_case)):
     require_auth(request)
     return to_unit_response(use_case.execute(UnitCreateDTO(building_id=payload.building_id, name=payload.name)))
@@ -61,7 +61,7 @@ def list_meter_points(request: Request, use_case: ListMeterPointsUseCase = Depen
     return [to_meter_point_response(item) for item in use_case.execute()]
 
 
-@router.post("/meter-points", response_model=MeterPointResponse)
+@router.post("/meter-points", response_model=MeterPointResponse, dependencies=[Depends(enforce_csrf)])
 def create_meter_point(request: Request, payload: MeterPointCreateRequest, use_case: CreateMeterPointWithDefaultDeviceUseCase = Depends(get_create_meter_point_use_case)):
     require_auth(request)
     return to_meter_point_response(use_case.execute(MeterPointCreateDTO(unit_id=payload.unit_id, name=payload.name)))

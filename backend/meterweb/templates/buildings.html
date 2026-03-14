@@ -10,6 +10,7 @@
 <div class="card mb-4">
   <div class="card-body">
     <form method="post" action="/buildings" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <div class="col-md-8">
         <input class="form-control" type="text" name="name" placeholder="{{ t('new_building_placeholder') }}" required />
       </div>

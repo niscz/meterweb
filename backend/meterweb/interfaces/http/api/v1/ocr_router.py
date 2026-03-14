@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from meterweb.application.dto import OCRDecisionDTO, PhotoReadingCreateDTO
 from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, OCRAcceptUseCase, OCRRejectUseCase, OCRRunUseCase
-from meterweb.interfaces.http.common import require_auth
+from meterweb.interfaces.http.common import enforce_csrf, require_auth
 from meterweb.interfaces.http.dependencies import (
     get_add_photo_reading_use_case,
     get_app_settings,
@@ -26,7 +26,7 @@ from meterweb.interfaces.http.schemas import (
 router = APIRouter(tags=["v1-ocr"])
 
 
-@router.post("/ocr/run", response_model=OCRRunResponse)
+@router.post("/ocr/run", response_model=OCRRunResponse, dependencies=[Depends(enforce_csrf)])
 def run_ocr(
     request: Request,
     payload: OCRRunRequest,
@@ -58,7 +58,7 @@ def run_ocr(
     )
 
 
-@router.post("/ocr/readings", response_model=PhotoReadingResponse)
+@router.post("/ocr/readings", response_model=PhotoReadingResponse, dependencies=[Depends(enforce_csrf)])
 def create_photo_reading(
     request: Request,
     payload: PhotoReadingCreateRequest,
@@ -101,7 +101,7 @@ def create_photo_reading(
     )
 
 
-@router.post("/ocr/{reading_id}/accept", response_model=OCRMetadataResponse)
+@router.post("/ocr/{reading_id}/accept", response_model=OCRMetadataResponse, dependencies=[Depends(enforce_csrf)])
 def accept_ocr(
     request: Request,
     reading_id: UUID,
@@ -118,7 +118,7 @@ def accept_ocr(
     )
 
 
-@router.post("/ocr/{reading_id}/reject", response_model=OCRMetadataResponse)
+@router.post("/ocr/{reading_id}/reject", response_model=OCRMetadataResponse, dependencies=[Depends(enforce_csrf)])
 def reject_ocr(
     request: Request,
     reading_id: UUID,

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+import re
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -42,8 +43,23 @@ def _client(tmp_path: Path) -> TestClient:
     return TestClient(app)
 
 
+
+
+def _extract_csrf_token(html: str) -> str:
+    match = re.search(r'name="csrf_token"\s+value="([^"]+)"', html)
+    assert match is not None
+    return match.group(1)
+
+
+def _csrf_headers(client: TestClient) -> dict[str, str]:
+    page = client.get("/dashboard")
+    token = _extract_csrf_token(page.text)
+    return {"X-CSRF-Token": token}
+
 def _login(client: TestClient) -> None:
-    response = client.post("/login", data={"username": "admin_user", "password": "SehrSicheresPasswort123!"}, follow_redirects=False)
+    login_page = client.get("/login")
+    csrf_token = _extract_csrf_token(login_page.text)
+    response = client.post("/login", data={"username": "admin_user", "password": "SehrSicheresPasswort123!", "csrf_token": csrf_token}, follow_redirects=False)
     assert response.status_code == 303
 
 
@@ -168,19 +184,19 @@ def test_extended_v1_endpoints_and_validation(monkeypatch, tmp_path: Path) -> No
 
     _login(client)
 
-    building = client.post("/api/v1/buildings", json={"name": "Haus API"}).json()
-    unit = client.post("/api/v1/units", json={"building_id": building["id"], "name": "WEG API"}).json()
-    meter_point = client.post("/api/v1/meter-points", json={"unit_id": unit["id"], "name": "Strom"}).json()
+    building = client.post("/api/v1/buildings", headers=_csrf_headers(client), json={"name": "Haus API"}).json()
+    unit = client.post("/api/v1/units", headers=_csrf_headers(client), json={"building_id": building["id"], "name": "WEG API"}).json()
+    meter_point = client.post("/api/v1/meter-points", headers=_csrf_headers(client), json={"unit_id": unit["id"], "name": "Strom"}).json()
     current_register = client.get(f"/api/v1/meter-points/{meter_point['id']}/current-register").json()
 
     upload_image_path = str((tmp_path / "uploads" / "meter.jpg").resolve())
 
-    ocr_run = client.post("/api/v1/ocr/run", json={"image_path": upload_image_path})
+    ocr_run = client.post("/api/v1/ocr/run", headers=_csrf_headers(client), json={"image_path": upload_image_path})
     assert ocr_run.status_code == 200
     assert ocr_run.json()["best_candidate"]["value"] == "1234"
 
     ocr_reading = client.post(
-        "/api/v1/ocr/readings",
+        "/api/v1/ocr/readings", headers=_csrf_headers(client),
         json={
             "meter_register_id": current_register["meter_register_id"],
             "measured_at": "2025-01-01T00:00:00+00:00",
@@ -192,12 +208,12 @@ def test_extended_v1_endpoints_and_validation(monkeypatch, tmp_path: Path) -> No
     assert ocr_reading.json()["reading"]["value"] == "1240"
 
 
-    blocked_ocr_run = client.post("/api/v1/ocr/run", json={"image_path": "../etc/passwd"})
+    blocked_ocr_run = client.post("/api/v1/ocr/run", headers=_csrf_headers(client), json={"image_path": "../etc/passwd"})
     assert blocked_ocr_run.status_code == 400
     assert "innerhalb des Upload-Verzeichnisses" in blocked_ocr_run.json()["detail"]
 
     blocked_ocr_reading = client.post(
-        "/api/v1/ocr/readings",
+        "/api/v1/ocr/readings", headers=_csrf_headers(client),
         json={
             "meter_register_id": current_register["meter_register_id"],
             "measured_at": "2025-01-02T00:00:00+00:00",
@@ -209,21 +225,22 @@ def test_extended_v1_endpoints_and_validation(monkeypatch, tmp_path: Path) -> No
     assert "innerhalb des Upload-Verzeichnisses" in blocked_ocr_reading.json()["detail"]
 
 
-    confirm_resp = client.post(f"/api/v1/readings/{fake_photo_use_case.last_reading_id}/confirm")
+    confirm_resp = client.post(f"/api/v1/readings/{fake_photo_use_case.last_reading_id}/confirm", headers=_csrf_headers(client))
     assert confirm_resp.status_code == 200
 
     correct_resp = client.post(
         f"/api/v1/readings/{fake_photo_use_case.last_reading_id}/correct",
+        headers=_csrf_headers(client),
         json={"value": "1250"},
     )
     assert correct_resp.status_code == 200
     assert correct_resp.json()["value"] == "1250"
 
-    ocr_accept = client.post(f"/api/v1/ocr/{fake_photo_use_case.last_reading_id}/accept")
+    ocr_accept = client.post(f"/api/v1/ocr/{fake_photo_use_case.last_reading_id}/accept", headers=_csrf_headers(client))
     assert ocr_accept.status_code == 200
     assert ocr_accept.json()["status"] == "accepted"
 
-    ocr_reject = client.post(f"/api/v1/ocr/{fake_photo_use_case.last_reading_id}/reject")
+    ocr_reject = client.post(f"/api/v1/ocr/{fake_photo_use_case.last_reading_id}/reject", headers=_csrf_headers(client))
     assert ocr_reject.status_code == 200
     assert ocr_reject.json()["status"] == "rejected"
 
@@ -254,12 +271,13 @@ def test_extended_v1_endpoints_and_validation(monkeypatch, tmp_path: Path) -> No
 
     invalid_sync_resolution = client.post(
         f"/api/v1/weather/buildings/{building['id']}/sync",
+        headers=_csrf_headers(client),
         json={"lat": 48.1, "lon": 11.5, "resolutions": ["weekly"]},
     )
     assert invalid_sync_resolution.status_code == 422
 
-    monthly = client.post("/api/v1/reports/monthly", json={"meter_register_id": current_register["meter_register_id"]})
-    export_csv = client.post("/api/v1/reports/export/csv", json={"meter_register_id": current_register["meter_register_id"]})
+    monthly = client.post("/api/v1/reports/monthly", headers=_csrf_headers(client), json={"meter_register_id": current_register["meter_register_id"]})
+    export_csv = client.post("/api/v1/reports/export/csv", headers=_csrf_headers(client), json={"meter_register_id": current_register["meter_register_id"]})
 
     assert monthly.status_code == 200
     assert export_csv.status_code == 200
@@ -273,17 +291,17 @@ def test_ocr_endpoints_map_expected_exceptions(monkeypatch, tmp_path: Path) -> N
     image_path = str((tmp_path / "uploads" / "meter.jpg").resolve())
 
     client.app.dependency_overrides[get_ocr_run_use_case] = lambda: _FailingOCRRunUseCase(FileNotFoundError("missing file"))
-    missing_file = client.post("/api/v1/ocr/run", json={"image_path": image_path})
+    missing_file = client.post("/api/v1/ocr/run", headers=_csrf_headers(client), json={"image_path": image_path})
     assert missing_file.status_code == 422
     assert missing_file.json() == {"detail": "Bilddatei nicht gefunden."}
 
     client.app.dependency_overrides[get_ocr_run_use_case] = lambda: _FailingOCRRunUseCase(RuntimeError("tesseract missing"))
-    ocr_unavailable = client.post("/api/v1/ocr/run", json={"image_path": image_path})
+    ocr_unavailable = client.post("/api/v1/ocr/run", headers=_csrf_headers(client), json={"image_path": image_path})
     assert ocr_unavailable.status_code == 422
     assert ocr_unavailable.json() == {"detail": "OCR-Verarbeitung derzeit nicht verfügbar."}
 
     client.app.dependency_overrides[get_ocr_run_use_case] = lambda: _FailingOCRRunUseCase(ValueError("Ungültiger OCR-Input"))
-    invalid_input = client.post("/api/v1/ocr/run", json={"image_path": image_path})
+    invalid_input = client.post("/api/v1/ocr/run", headers=_csrf_headers(client), json={"image_path": image_path})
     assert invalid_input.status_code == 400
     assert invalid_input.json() == {"detail": "Ungültiger OCR-Input"}
 
@@ -293,9 +311,9 @@ def test_create_photo_reading_maps_expected_exceptions(monkeypatch, tmp_path: Pa
     client = _client(tmp_path)
     _login(client)
 
-    building = client.post("/api/v1/buildings", json={"name": "Haus API"}).json()
-    unit = client.post("/api/v1/units", json={"building_id": building["id"], "name": "WEG API"}).json()
-    meter_point = client.post("/api/v1/meter-points", json={"unit_id": unit["id"], "name": "Strom"}).json()
+    building = client.post("/api/v1/buildings", headers=_csrf_headers(client), json={"name": "Haus API"}).json()
+    unit = client.post("/api/v1/units", headers=_csrf_headers(client), json={"building_id": building["id"], "name": "WEG API"}).json()
+    meter_point = client.post("/api/v1/meter-points", headers=_csrf_headers(client), json={"unit_id": unit["id"], "name": "Strom"}).json()
     current_register = client.get(f"/api/v1/meter-points/{meter_point['id']}/current-register").json()
     image_path = str((tmp_path / "uploads" / "meter.jpg").resolve())
 
@@ -307,16 +325,16 @@ def test_create_photo_reading_maps_expected_exceptions(monkeypatch, tmp_path: Pa
     }
 
     client.app.dependency_overrides[get_add_photo_reading_use_case] = lambda: _FailingPhotoUseCase(FileNotFoundError("missing file"))
-    missing_file = client.post("/api/v1/ocr/readings", json=base_payload)
+    missing_file = client.post("/api/v1/ocr/readings", headers=_csrf_headers(client), json=base_payload)
     assert missing_file.status_code == 422
     assert missing_file.json() == {"detail": "Bilddatei nicht gefunden."}
 
     client.app.dependency_overrides[get_add_photo_reading_use_case] = lambda: _FailingPhotoUseCase(RuntimeError("tesseract missing"))
-    ocr_unavailable = client.post("/api/v1/ocr/readings", json=base_payload)
+    ocr_unavailable = client.post("/api/v1/ocr/readings", headers=_csrf_headers(client), json=base_payload)
     assert ocr_unavailable.status_code == 422
     assert ocr_unavailable.json() == {"detail": "OCR-Verarbeitung derzeit nicht verfügbar."}
 
     client.app.dependency_overrides[get_add_photo_reading_use_case] = lambda: _FailingPhotoUseCase(ValueError("Ungültiger OCR-Input"))
-    invalid_input = client.post("/api/v1/ocr/readings", json=base_payload)
+    invalid_input = client.post("/api/v1/ocr/readings", headers=_csrf_headers(client), json=base_payload)
     assert invalid_input.status_code == 400
     assert invalid_input.json() == {"detail": "Ungültiger OCR-Input"}

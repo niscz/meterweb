@@ -5,14 +5,14 @@ from fastapi import APIRouter, Depends, Request
 
 from meterweb.application.use_cases.analytics import AnalyticsUseCase
 from meterweb.application.use_cases.weather import WeatherSyncUseCase
-from meterweb.interfaces.http.common import require_auth
+from meterweb.interfaces.http.common import enforce_csrf, require_auth
 from meterweb.interfaces.http.dependencies import get_analytics_use_case, get_weather_sync_use_case
 from meterweb.interfaces.http.schemas import JobStatusResponse, WeatherSyncRequest
 
 router = APIRouter(tags=["v1-jobs"])
 
 
-@router.post("/jobs/weather-sync/{building_id}", response_model=JobStatusResponse)
+@router.post("/jobs/weather-sync/{building_id}", response_model=JobStatusResponse, dependencies=[Depends(enforce_csrf)])
 def weather_sync_job(
     request: Request,
     building_id: UUID,
@@ -27,7 +27,7 @@ def weather_sync_job(
     return {"status": "ok"}
 
 
-@router.post("/jobs/analytics/recompute/{meter_point_id}", response_model=JobStatusResponse)
+@router.post("/jobs/analytics/recompute/{meter_point_id}", response_model=JobStatusResponse, dependencies=[Depends(enforce_csrf)])
 def recompute_analytics_job(
     request: Request,
     meter_point_id: UUID,

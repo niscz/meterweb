@@ -9,18 +9,20 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from meterweb.application.dto import BuildingCreateDTO, LoginDTO, MeterPointCreateDTO, PhotoReadingCreateDTO, ReadingCreateDTO, UnitCreateDTO
-from meterweb.application.use_cases import (
-    AddPhotoReadingUseCase,
-    AddReadingUseCase,
-    AnalyticsUseCase,
+from meterweb.application.use_cases.analytics import AnalyticsUseCase
+from meterweb.application.use_cases.auth import LoginUseCase
+from meterweb.application.use_cases.buildings import (
     CreateBuildingUseCase,
     CreateMeterPointUseCase,
     CreateUnitUseCase,
-    ExportUseCase,
     ListBuildingsUseCase,
     ListMeterPointsUseCase,
     ListUnitsUseCase,
-    LoginUseCase,
+)
+from meterweb.application.use_cases.exports import ExportUseCase
+from meterweb.application.use_cases.readings import (
+    AddPhotoReadingUseCase,
+    AddReadingUseCase,
 )
 from meterweb.domain.auth import AuthenticationError
 from meterweb.interfaces.http.common import TRANSLATIONS, get_locale, require_auth

@@ -1,4 +1,4 @@
-import importlib.util
+import importlib
 import logging
 import os
 import shutil
@@ -26,9 +26,18 @@ def _get_env_bool(name: str, default: bool) -> bool:
 
 
 def _feature_flags() -> dict[str, dict[str, object]]:
-    ocr_python_ready = all(importlib.util.find_spec(mod) is not None for mod in ("cv2", "pytesseract", "PIL"))
+    def _import_optional_modules(*modules: str) -> tuple[bool, list[str]]:
+        missing: list[str] = []
+        for module in modules:
+            try:
+                importlib.import_module(module)
+            except Exception:
+                missing.append(module)
+        return len(missing) == 0, missing
+
+    ocr_python_ready, _ = _import_optional_modules("cv2", "pytesseract", "PIL")
     tesseract_binary = shutil.which("tesseract") is not None
-    reports_python_ready = all(importlib.util.find_spec(mod) is not None for mod in ("weasyprint", "openpyxl"))
+    reports_python_ready, _ = _import_optional_modules("weasyprint", "openpyxl")
 
     return {
         "ocr": {

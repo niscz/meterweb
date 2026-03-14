@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -11,6 +10,7 @@ from meterweb.application.dto import PhotoReadingCreateDTO, ReadingCreateDTO
 from meterweb.application.use_cases.analytics import AnalyticsUseCase
 from meterweb.application.use_cases.buildings import ListBuildingsUseCase, ListMeterPointsUseCase, ListUnitsUseCase
 from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, AddReadingUseCase
+from meterweb.bootstrap import get_container
 from meterweb.interfaces.http.common import get_locale, require_auth
 from meterweb.interfaces.http.dependencies import (
     get_add_photo_reading_use_case,
@@ -24,7 +24,7 @@ from meterweb.interfaces.http.dependencies import (
 templates = Jinja2Templates(directory="meterweb/templates")
 router = APIRouter(tags=["web-readings"])
 
-UPLOAD_DIR = Path(os.getenv("UPLOADS_DIR", "/uploads"))
+UPLOAD_DIR = get_container().settings.uploads_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

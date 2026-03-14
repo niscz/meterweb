@@ -23,3 +23,22 @@ def test_health_features_endpoint_exposes_feature_flags(monkeypatch) -> None:
         "status": "ok",
         "features": {"ocr": {"enabled": False, "missing": ["system:tesseract-ocr"]}},
     }
+
+
+def test_feature_flags_disable_reports_when_import_fails(monkeypatch) -> None:
+    main = importlib.import_module("meterweb.main")
+
+    real_import_module = importlib.import_module
+
+    def _fake_import_module(name: str):
+        if name == "weasyprint":
+            raise OSError("missing cairo")
+        return real_import_module(name)
+
+    monkeypatch.setattr(main.importlib, "import_module", _fake_import_module)
+    monkeypatch.setattr(main.shutil, "which", lambda _name: "/usr/bin/tesseract")
+
+    features = main._feature_flags()
+
+    assert features["reports"]["enabled"] is False
+    assert features["reports"]["missing"] == ["python:weasyprint/openpyxl"]

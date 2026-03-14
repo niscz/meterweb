@@ -14,9 +14,12 @@ class DummyUseCase:
         return []
 
 
-class DummyFactory:
-    def create_weather_provider(self):
-        return object()
+class DummyContainer:
+    def __init__(self, use_case: DummyUseCase) -> None:
+        self._use_case = use_case
+
+    def weather_sync_use_case(self) -> DummyUseCase:
+        return self._use_case
 
 
 def test_sync_weather_builds_concrete_provider_and_syncs(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -25,10 +28,7 @@ def test_sync_weather_builds_concrete_provider_and_syncs(monkeypatch: pytest.Mon
     monkeypatch.setenv("WEATHER_BUILDING_ID", "00000000-0000-0000-0000-000000000001")
     monkeypatch.setenv("WEATHER_LAT", "52.52")
     monkeypatch.setenv("WEATHER_LON", "13.405")
-    monkeypatch.setattr(worker.ProviderConfig, "from_env", classmethod(lambda cls: object()))
-    monkeypatch.setattr(worker, "ProviderFactory", lambda config: DummyFactory())
-    monkeypatch.setattr(worker, "JsonWeatherStationRepository", lambda _path: object())
-    monkeypatch.setattr(worker, "WeatherSyncUseCase", lambda _provider, _repo: use_case)
+    monkeypatch.setattr(worker, "get_container", lambda: DummyContainer(use_case))
     monkeypatch.setattr(worker, "date", type("DummyDate", (), {"today": staticmethod(lambda: date(2025, 1, 10))}))
 
     worker._sync_weather()

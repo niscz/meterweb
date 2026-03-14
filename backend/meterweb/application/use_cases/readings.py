@@ -35,22 +35,23 @@ class AddReadingUseCase:
         self._uow.begin()
         try:
             created = self._uow.reading_repository.add_manual(data.meter_point_id, measured_at, data.value)
-            plausibility = evaluate_reading_plausibility(
-                self._uow.reading_repository,
-                data.meter_point_id,
-                ocr_confidence=None,
-            )
             self._uow.commit()
-            return ReadingViewDTO(
-                id=created.id,
-                meter_point_id=data.meter_point_id,
-                measured_at=created.measured_at,
-                value=created.value,
-                plausible=plausibility.plausible,
-            )
         except Exception:
             self._uow.rollback()
             raise
+
+        plausibility = evaluate_reading_plausibility(
+            self._uow.reading_repository,
+            data.meter_point_id,
+            ocr_confidence=None,
+        )
+        return ReadingViewDTO(
+            id=created.id,
+            meter_point_id=data.meter_point_id,
+            measured_at=created.measured_at,
+            value=created.value,
+            plausible=plausibility.plausible,
+        )
 
 
 class OCRRunUseCase:
@@ -125,26 +126,27 @@ class AddPhotoReadingUseCase:
                 data.image_path,
                 ocr_confidence,
             )
-            plausibility = evaluate_reading_plausibility(
-                self._uow.reading_repository,
-                data.meter_point_id,
-                ocr_confidence=ocr_confidence,
-            )
             self._uow.commit()
-            return (
-                ReadingViewDTO(
-                    id=created.id,
-                    meter_point_id=data.meter_point_id,
-                    measured_at=created.measured_at,
-                    value=created.value,
-                    plausible=plausibility.plausible,
-                ),
-                ocr_result,
-                plausibility,
-            )
         except Exception:
             self._uow.rollback()
             raise
+
+        plausibility = evaluate_reading_plausibility(
+            self._uow.reading_repository,
+            data.meter_point_id,
+            ocr_confidence=ocr_confidence,
+        )
+        return (
+            ReadingViewDTO(
+                id=created.id,
+                meter_point_id=data.meter_point_id,
+                measured_at=created.measured_at,
+                value=created.value,
+                plausible=plausibility.plausible,
+            ),
+            ocr_result,
+            plausibility,
+        )
 
 
 class ProcessAbsoluteReadingUseCase:

@@ -13,6 +13,7 @@ from meterweb.infrastructure.providers.weather import BrightSkyWeatherProvider
 class ProviderConfig:
     weather_provider: str = "brightsky"
     weather_cache_dir: str = ".cache/weather"
+    weather_base_url: str = "https://api.brightsky.dev"
     ocr_provider: str = "local"
     ocr_language: str = "deu"
     chart_adapter: str = "apexcharts"
@@ -23,6 +24,7 @@ class ProviderConfig:
         return cls(
             weather_provider=os.getenv("WEATHER_PROVIDER", "brightsky"),
             weather_cache_dir=os.getenv("WEATHER_CACHE_DIR", ".cache/weather"),
+            weather_base_url=os.getenv("WEATHER_BASE_URL", "https://api.brightsky.dev"),
             ocr_provider=os.getenv("OCR_PROVIDER", "local"),
             ocr_language=os.getenv("OCR_LANGUAGE", "deu"),
             chart_adapter=os.getenv("CHART_ADAPTER", "apexcharts"),
@@ -36,7 +38,10 @@ class ProviderFactory:
 
     def create_weather_provider(self) -> WeatherProvider:
         if self._config.weather_provider == "brightsky":
-            return BrightSkyWeatherProvider(cache_dir=Path(self._config.weather_cache_dir))
+            return BrightSkyWeatherProvider(
+                cache_dir=Path(self._config.weather_cache_dir),
+                base_url=self._config.weather_base_url,
+            )
         raise ValueError(f"Unbekannter Weather-Provider: {self._config.weather_provider}")
 
     def create_ocr_provider(self) -> OCRProvider:

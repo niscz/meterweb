@@ -2,6 +2,7 @@ from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
 
 from meterweb.application.use_cases.weather import WeatherSyncUseCase
@@ -83,7 +84,10 @@ def weather_series(
             resolution=resolution,
         )
     except ValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=jsonable_encoder(exc.errors(include_input=False)),
+        ) from exc
 
     points = use_case.get_series(
         building_id,

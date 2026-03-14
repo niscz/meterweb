@@ -230,6 +230,7 @@ def test_extended_v1_endpoints_and_validation(monkeypatch, tmp_path: Path) -> No
         },
     )
     assert invalid_series_range.status_code == 422
+    assert isinstance(invalid_series_range.json().get("detail"), list)
 
     invalid_sync_resolution = client.post(
         f"/api/v1/weather/buildings/{building['id']}/sync",

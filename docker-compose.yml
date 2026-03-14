@@ -20,7 +20,7 @@ services:
       - "8000:8000"
     volumes:
       - app_data:/data
-      - uploads:/uploads
+      - uploads:${UPLOADS_DIR:-/uploads}
       - reports:/reports
       - backups:/backups
     restart: unless-stopped
@@ -44,7 +44,7 @@ services:
              python -m meterweb.worker"
     volumes:
       - app_data:/data
-      - uploads:/uploads
+      - uploads:${UPLOADS_DIR:-/uploads}
       - reports:/reports
       - backups:/backups
     restart: unless-stopped

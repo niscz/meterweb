@@ -9,6 +9,9 @@ from meterweb.infrastructure.providers import ProviderConfig
 class AppSettings:
     weather_station_overrides_path: Path = Path("/data/weather_station_overrides.json")
     uploads_dir: Path = Path("/uploads")
+    photo_upload_max_size_bytes: int = 10 * 1024 * 1024
+    photo_upload_allowed_mime_types: tuple[str, ...] = ("image/jpeg", "image/png", "image/webp")
+    photo_upload_allowed_extensions: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp")
 
     weather_provider: str = "brightsky"
     weather_cache_dir: str = ".cache/weather"
@@ -28,6 +31,14 @@ class AppSettings:
                 os.getenv("WEATHER_STATION_OVERRIDES_PATH", "/data/weather_station_overrides.json")
             ),
             uploads_dir=Path(os.getenv("UPLOADS_DIR", "/uploads")),
+            photo_upload_max_size_bytes=_env_int("PHOTO_UPLOAD_MAX_SIZE_BYTES", 10 * 1024 * 1024),
+            photo_upload_allowed_mime_types=_env_list(
+                "PHOTO_UPLOAD_ALLOWED_MIME_TYPES",
+                ("image/jpeg", "image/png", "image/webp"),
+            ),
+            photo_upload_allowed_extensions=_normalize_extensions(
+                _env_list("PHOTO_UPLOAD_ALLOWED_EXTENSIONS", (".jpg", ".jpeg", ".png", ".webp"))
+            ),
             weather_provider=os.getenv("WEATHER_PROVIDER", "brightsky"),
             weather_cache_dir=os.getenv("WEATHER_CACHE_DIR", ".cache/weather"),
             weather_base_url=os.getenv("WEATHER_BASE_URL", "https://api.brightsky.dev"),
@@ -60,3 +71,20 @@ def _env_int(name: str, default: int) -> int:
     if value <= 0:
         raise RuntimeError(f"Environment variable {name} must be greater than 0")
     return value
+
+
+def _env_list(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    values = tuple(part.strip().lower() for part in raw.split(",") if part.strip())
+    if not values:
+        raise RuntimeError(f"Environment variable {name} must not be empty")
+    return values
+
+
+def _normalize_extensions(values: tuple[str, ...]) -> tuple[str, ...]:
+    normalized = tuple(value if value.startswith(".") else f".{value}" for value in values)
+    if not normalized:
+        raise RuntimeError("PHOTO_UPLOAD_ALLOWED_EXTENSIONS must not be empty")
+    return normalized

@@ -3,7 +3,7 @@ from io import BytesIO
 from uuid import uuid4
 
 import pytest
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 
 import meterweb.interfaces.http.web.readings_router as readings_router
 
@@ -64,7 +64,7 @@ def test_resolve_register_id_raises_when_no_active_register(monkeypatch) -> None
 
 def test_create_photo_reading_handles_invalid_input_and_cleans_upload(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(readings_router, "UPLOAD_DIR", tmp_path)
-    photo = UploadFile(filename="meter.jpg", file=BytesIO(b"img"))
+    photo = UploadFile(filename="meter.jpg", file=BytesIO(b"img"), headers={"content-type": "image/jpeg"})
 
     response = asyncio.run(
         readings_router.create_photo_reading(
@@ -90,7 +90,7 @@ def test_create_photo_reading_handles_invalid_input_and_cleans_upload(tmp_path, 
 
 def test_create_photo_reading_handles_ocr_errors_and_cleans_upload(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(readings_router, "UPLOAD_DIR", tmp_path)
-    photo = UploadFile(filename="meter.jpg", file=BytesIO(b"img"))
+    photo = UploadFile(filename="meter.jpg", file=BytesIO(b"img"), headers={"content-type": "image/jpeg"})
 
     response = asyncio.run(
         readings_router.create_photo_reading(
@@ -111,4 +111,72 @@ def test_create_photo_reading_handles_ocr_errors_and_cleans_upload(tmp_path, mon
 
     assert response.template.name == "dashboard.html"
     assert response.context["reading_error"] == readings_router.translate("de", "photo_reading_ocr_failed")
+    assert list(tmp_path.iterdir()) == []
+
+
+async def _save_upload(router_module, upload_file: UploadFile):
+    return await router_module._save_upload_streaming(upload_file)
+
+
+def test_save_upload_streaming_valid_upload(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(readings_router, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(readings_router, "PHOTO_UPLOAD_MAX_SIZE_BYTES", 1024)
+    monkeypatch.setattr(readings_router, "ALLOWED_PHOTO_EXTENSIONS", {".jpg"})
+    monkeypatch.setattr(readings_router, "ALLOWED_PHOTO_MIME_TYPES", {"image/jpeg"})
+    photo = UploadFile(filename="meter.jpg", file=BytesIO(b"abc123"), headers={"content-type": "image/jpeg"})
+
+    stored_path = asyncio.run(_save_upload(readings_router, photo))
+
+    assert stored_path.exists()
+    assert stored_path.read_bytes() == b"abc123"
+
+
+def test_save_upload_streaming_rejects_too_large_files_and_cleans_up(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(readings_router, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(readings_router, "PHOTO_UPLOAD_MAX_SIZE_BYTES", 4)
+    monkeypatch.setattr(readings_router, "ALLOWED_PHOTO_EXTENSIONS", {".jpg"})
+    monkeypatch.setattr(readings_router, "ALLOWED_PHOTO_MIME_TYPES", {"image/jpeg"})
+    photo = UploadFile(filename="meter.jpg", file=BytesIO(b"abcdef"), headers={"content-type": "image/jpeg"})
+
+    with pytest.raises(HTTPException) as err:
+        asyncio.run(_save_upload(readings_router, photo))
+
+    assert err.value.status_code == 413
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_save_upload_streaming_rejects_invalid_file_type(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(readings_router, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(readings_router, "PHOTO_UPLOAD_MAX_SIZE_BYTES", 1024)
+    monkeypatch.setattr(readings_router, "ALLOWED_PHOTO_EXTENSIONS", {".jpg"})
+    monkeypatch.setattr(readings_router, "ALLOWED_PHOTO_MIME_TYPES", {"image/jpeg"})
+    photo = UploadFile(filename="meter.gif", file=BytesIO(b"gif"), headers={"content-type": "image/gif"})
+
+    with pytest.raises(HTTPException) as err:
+        asyncio.run(_save_upload(readings_router, photo))
+
+    assert err.value.status_code == 400
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_save_upload_streaming_cleans_up_when_upload_aborts_mid_stream(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(readings_router, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(readings_router, "PHOTO_UPLOAD_MAX_SIZE_BYTES", 1024)
+    monkeypatch.setattr(readings_router, "ALLOWED_PHOTO_EXTENSIONS", {".jpg"})
+    monkeypatch.setattr(readings_router, "ALLOWED_PHOTO_MIME_TYPES", {"image/jpeg"})
+
+    photo = UploadFile(filename="meter.jpg", file=BytesIO(b"start"), headers={"content-type": "image/jpeg"})
+    chunks = iter([b"part", RuntimeError("upload interrupted")])
+
+    async def _failing_read(_size: int = -1):
+        chunk = next(chunks)
+        if isinstance(chunk, Exception):
+            raise chunk
+        return chunk
+
+    photo.read = _failing_read
+
+    with pytest.raises(RuntimeError, match="upload interrupted"):
+        asyncio.run(_save_upload(readings_router, photo))
+
     assert list(tmp_path.iterdir()) == []

@@ -11,7 +11,7 @@ from meterweb.application.dto import (
     ReadingCreateDTO,
     ReadingViewDTO,
 )
-from meterweb.application.ports import OCRProvider, ReadingRepository
+from meterweb.application.ports import OCRProvider, UnitOfWork
 from meterweb.application.services.plausibility import (
     ReadingPlausibilityResult,
     evaluate_reading_plausibility,
@@ -25,26 +25,32 @@ from meterweb.domain.metering import (
 
 
 class AddReadingUseCase:
-    def __init__(self, repository: ReadingRepository) -> None:
-        self._repository = repository
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
 
     def execute(self, data: ReadingCreateDTO) -> ReadingViewDTO:
         measured_at = data.measured_at
         if measured_at.tzinfo is None:
             measured_at = measured_at.replace(tzinfo=timezone.utc)
-        created = self._repository.add_manual(data.meter_point_id, measured_at, data.value)
-        plausibility = evaluate_reading_plausibility(
-            self._repository,
-            data.meter_point_id,
-            ocr_confidence=None,
-        )
-        return ReadingViewDTO(
-            id=created.id,
-            meter_point_id=data.meter_point_id,
-            measured_at=created.measured_at,
-            value=created.value,
-            plausible=plausibility.plausible,
-        )
+        self._uow.begin()
+        try:
+            created = self._uow.reading_repository.add_manual(data.meter_point_id, measured_at, data.value)
+            plausibility = evaluate_reading_plausibility(
+                self._uow.reading_repository,
+                data.meter_point_id,
+                ocr_confidence=None,
+            )
+            self._uow.commit()
+            return ReadingViewDTO(
+                id=created.id,
+                meter_point_id=data.meter_point_id,
+                measured_at=created.measured_at,
+                value=created.value,
+                plausible=plausibility.plausible,
+            )
+        except Exception:
+            self._uow.rollback()
+            raise
 
 
 class OCRRunUseCase:
@@ -85,8 +91,8 @@ class OCRRunUseCase:
 
 
 class AddPhotoReadingUseCase:
-    def __init__(self, repository: ReadingRepository, ocr_use_case: OCRRunUseCase) -> None:
-        self._repository = repository
+    def __init__(self, uow: UnitOfWork, ocr_use_case: OCRRunUseCase) -> None:
+        self._uow = uow
         self._ocr_use_case = ocr_use_case
 
     def execute(
@@ -110,29 +116,35 @@ class AddPhotoReadingUseCase:
             if ocr_result.best_candidate
             else 0.0
         )
-        created = self._repository.add_photo(
-            data.meter_point_id,
-            measured_at,
-            value,
-            data.image_path,
-            ocr_confidence,
-        )
-        plausibility = evaluate_reading_plausibility(
-            self._repository,
-            data.meter_point_id,
-            ocr_confidence=ocr_confidence,
-        )
-        return (
-            ReadingViewDTO(
-                id=created.id,
-                meter_point_id=data.meter_point_id,
-                measured_at=created.measured_at,
-                value=created.value,
-                plausible=plausibility.plausible,
-            ),
-            ocr_result,
-            plausibility,
-        )
+        self._uow.begin()
+        try:
+            created = self._uow.reading_repository.add_photo(
+                data.meter_point_id,
+                measured_at,
+                value,
+                data.image_path,
+                ocr_confidence,
+            )
+            plausibility = evaluate_reading_plausibility(
+                self._uow.reading_repository,
+                data.meter_point_id,
+                ocr_confidence=ocr_confidence,
+            )
+            self._uow.commit()
+            return (
+                ReadingViewDTO(
+                    id=created.id,
+                    meter_point_id=data.meter_point_id,
+                    measured_at=created.measured_at,
+                    value=created.value,
+                    plausible=plausibility.plausible,
+                ),
+                ocr_result,
+                plausibility,
+            )
+        except Exception:
+            self._uow.rollback()
+            raise
 
 
 class ProcessAbsoluteReadingUseCase:

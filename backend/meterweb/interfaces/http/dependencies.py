@@ -5,7 +5,7 @@ from meterweb.application.use_cases.analytics import AnalyticsUseCase
 from meterweb.application.use_cases.auth import LoginUseCase
 from meterweb.application.use_cases.buildings import (
     CreateBuildingUseCase,
-    CreateMeterPointUseCase,
+    CreateMeterPointWithDefaultDeviceUseCase,
     CreateUnitUseCase,
     ListBuildingsUseCase,
     ListMeterPointsUseCase,
@@ -57,8 +57,8 @@ def get_list_units_use_case(
 def get_create_meter_point_use_case(
     session: Session = Depends(get_session),
     app_container: AppContainer = Depends(container),
-) -> CreateMeterPointUseCase:
-    return app_container.create_meter_point_use_case(session)
+) -> CreateMeterPointWithDefaultDeviceUseCase:
+    return app_container.create_meter_point_with_default_device_use_case(session)
 
 
 def get_list_meter_points_use_case(

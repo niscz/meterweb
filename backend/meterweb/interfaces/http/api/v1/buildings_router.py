@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from meterweb.application.dto import BuildingCreateDTO, MeterPointCreateDTO, UnitCreateDTO
 from meterweb.application.use_cases.buildings import (
     CreateBuildingUseCase,
-    CreateMeterPointUseCase,
+    CreateMeterPointWithDefaultDeviceUseCase,
     CreateUnitUseCase,
     ListBuildingsUseCase,
     ListMeterPointsUseCase,
@@ -62,6 +62,6 @@ def list_meter_points(request: Request, use_case: ListMeterPointsUseCase = Depen
 
 
 @router.post("/meter-points", response_model=MeterPointResponse)
-def create_meter_point(request: Request, payload: MeterPointCreateRequest, use_case: CreateMeterPointUseCase = Depends(get_create_meter_point_use_case)):
+def create_meter_point(request: Request, payload: MeterPointCreateRequest, use_case: CreateMeterPointWithDefaultDeviceUseCase = Depends(get_create_meter_point_use_case)):
     require_auth(request)
     return to_meter_point_response(use_case.execute(MeterPointCreateDTO(unit_id=payload.unit_id, name=payload.name)))

@@ -21,7 +21,7 @@ def _to_decimal(value: object) -> Decimal:
 
 def format_number(value: object, lang: str) -> str:
     number = _to_decimal(value)
-    raw = format(number.normalize(), "f") if number != number.to_integral() else str(number.quantize(Decimal("1")))
+    raw = format(number, "f")
     if "." in raw:
         int_part, frac_part = raw.split(".", 1)
         frac_part = frac_part.rstrip("0")

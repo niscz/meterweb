@@ -1,4 +1,5 @@
 from pathlib import Path
+from decimal import Decimal
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -49,3 +50,17 @@ def test_monthly_report_pdf_template_golden_de_and_en() -> None:
     assert '<html lang="en">' in rendered_en
     assert "Monthly report by object" in rendered_en
     assert "<td>1,234.5</td>" in rendered_en
+
+
+def test_format_number_handles_large_integral_decimals() -> None:
+    large = Decimal("999999999999999999999999999999")
+
+    assert format_number(large, "en") == "999,999,999,999,999,999,999,999,999,999"
+    assert format_number(large, "de") == "999.999.999.999.999.999.999.999.999.999"
+
+
+def test_format_number_handles_exponent_integral_decimals() -> None:
+    large_exponent = Decimal("1E+30")
+
+    assert format_number(large_exponent, "en") == "1,000,000,000,000,000,000,000,000,000,000"
+    assert format_number(large_exponent, "de") == "1.000.000.000.000.000.000.000.000.000.000"

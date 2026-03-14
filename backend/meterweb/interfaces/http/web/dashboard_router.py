@@ -84,22 +84,20 @@ def create_building(
 
 
 @router.post("/dashboard/units")
-def create_unit(request: Request, building_id: str = Form(), name: str = Form(), use_case: CreateUnitUseCase = Depends(get_create_unit_use_case)):
+def create_unit(request: Request, building_id: UUID = Form(), name: str = Form(), use_case: CreateUnitUseCase = Depends(get_create_unit_use_case)):
     require_auth(request)
     try:
-        parsed_building_id = UUID(building_id)
-        use_case.execute(UnitCreateDTO(building_id=parsed_building_id, name=name))
+        use_case.execute(UnitCreateDTO(building_id=building_id, name=name))
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/dashboard/meter-points")
-def create_meter_point(request: Request, unit_id: str = Form(), name: str = Form(), use_case: CreateMeterPointUseCase = Depends(get_create_meter_point_use_case)):
+def create_meter_point(request: Request, unit_id: UUID = Form(), name: str = Form(), use_case: CreateMeterPointUseCase = Depends(get_create_meter_point_use_case)):
     require_auth(request)
     try:
-        parsed_unit_id = UUID(unit_id)
-        use_case.execute(MeterPointCreateDTO(unit_id=parsed_unit_id, name=name))
+        use_case.execute(MeterPointCreateDTO(unit_id=unit_id, name=name))
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)

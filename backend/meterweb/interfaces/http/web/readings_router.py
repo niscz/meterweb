@@ -31,12 +31,18 @@ UPLOAD_DIR = get_container().settings.uploads_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _resolve_register_id(session: Session, meter_register_id: UUID | None, meter_point_id: UUID | None) -> UUID:
+def _as_uuid(value: UUID | str) -> UUID:
+    if isinstance(value, UUID):
+        return value
+    return UUID(value)
+
+
+def _resolve_register_id(session: Session, meter_register_id: UUID | str | None, meter_point_id: UUID | str | None) -> UUID:
     if meter_register_id:
-        return meter_register_id
+        return _as_uuid(meter_register_id)
     if not meter_point_id:
         raise ValueError("Bitte Messpunkt oder Zählwerk angeben.")
-    register_id = SqlAlchemyReadingRepository(session).get_current_register_for_meter_point(meter_point_id)
+    register_id = SqlAlchemyReadingRepository(session).get_current_register_for_meter_point(_as_uuid(meter_point_id))
     if register_id is None:
         raise ValueError("Messpunkt hat kein aktives Register.")
     return register_id

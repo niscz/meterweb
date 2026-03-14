@@ -6,6 +6,7 @@ import shutil
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
+from meterweb.bootstrap import get_container
 from meterweb.infrastructure.auth import validate_runtime_security_config
 from meterweb.infrastructure.db import configure_database, init_db
 from meterweb.interfaces.http.errors import register_exception_handlers
@@ -43,7 +44,11 @@ def _feature_flags() -> dict[str, dict[str, object]]:
         "ocr": {
             "enabled": ocr_python_ready and tesseract_binary,
             "missing": [
-                *([] if ocr_python_ready else ["python:opencv-python-headless/pytesseract/Pillow"]),
+                *(
+                    []
+                    if ocr_python_ready
+                    else ["python:opencv-python-headless/pytesseract/Pillow"]
+                ),
                 *([] if tesseract_binary else ["system:tesseract-ocr"]),
             ],
         },
@@ -52,6 +57,17 @@ def _feature_flags() -> dict[str, dict[str, object]]:
             "missing": [] if reports_python_ready else ["python:weasyprint/openpyxl"],
         },
     }
+
+
+def initialize_runtime_directories() -> None:
+    uploads_dir = get_container().settings.uploads_dir
+    try:
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise RuntimeError(
+            "Betriebsfehler: Upload-Verzeichnis kann nicht erstellt oder verwendet werden: "
+            f"{uploads_dir}"
+        ) from exc
 
 
 def create_app() -> FastAPI:
@@ -86,6 +102,7 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def _startup() -> None:
+        initialize_runtime_directories()
         init_db()
         features = _feature_flags()
         logger = logging.getLogger("meterweb.startup")

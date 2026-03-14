@@ -151,6 +151,52 @@ Persistente Volumes (Compose):
 
 ---
 
+
+## 📦 Reproduzierbare Dependency-Gruppen
+
+Das Backend definiert optionale Extras, damit Produktionsfeatures gezielt installierbar sind:
+
+- `ocr`: `opencv-python-headless`, `pytesseract`, `Pillow`
+- `reports`: `weasyprint`, `openpyxl`
+- `dev`: Test-/Entwicklungsabhängigkeiten
+
+Beispiele:
+
+```bash
+cd backend
+pip install -e .[dev]
+pip install -e .[ocr,reports]
+```
+
+### Erforderliche Systempakete
+
+Für OCR und PDF/XLSX müssen zusätzlich OS-Bibliotheken verfügbar sein:
+
+- OCR: `tesseract-ocr`, optional Sprachpakete wie `tesseract-ocr-deu`
+- WeasyPrint: `libpango-1.0-0`, `libpangoft2-1.0-0`, `libcairo2`, `libgdk-pixbuf-2.0-0`, `libxml2`, `libxslt1.1`
+
+Im bereitgestellten Dockerfile sind diese Pakete bereits enthalten.
+
+### Feature-Status beim Start und per Health-Endpoint
+
+Beim App-Start werden Hinweise geloggt, welche Feature-Gruppen vollständig aktiv sind bzw. welche Laufzeit-Abhängigkeiten fehlen.
+
+Zusätzlich liefert der Endpoint `GET /health/features` den aktuellen Status:
+
+```json
+{
+  "status": "ok",
+  "features": {
+    "ocr": {"enabled": true, "missing": []},
+    "reports": {"enabled": true, "missing": []}
+  }
+}
+```
+
+Wenn Abhängigkeiten fehlen, stehen sie in `missing` (z. B. `system:tesseract-ocr`).
+
+---
+
 ## 🧪 Entwicklung (lokal ohne Docker)
 
 ```bash

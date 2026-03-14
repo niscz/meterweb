@@ -9,6 +9,36 @@ Diese Basis implementiert einen modularen Monolithen mit klaren Schichten:
 - `meterweb/templates`: Jinja2 + Tabler UI
 - `tests/unit` und `tests/integration`
 
+
+## Optionale Extras für Produktionsfeatures
+
+In `pyproject.toml` sind reproduzierbare Extra-Gruppen definiert:
+
+- `ocr`: `opencv-python-headless`, `pytesseract`, `Pillow`
+- `reports`: `weasyprint`, `openpyxl`
+- `dev`: Tests/Tools
+
+Installation lokal:
+
+```bash
+pip install -e .[dev]
+pip install -e .[ocr,reports]
+```
+
+### Benötigte Systempakete
+
+Zusätzlich zu Python-Extras werden Systempakete benötigt:
+
+- OCR: `tesseract-ocr` (+ optional Sprachdaten wie `tesseract-ocr-deu`)
+- WeasyPrint-Libs: `libpango-1.0-0`, `libpangoft2-1.0-0`, `libcairo2`, `libgdk-pixbuf-2.0-0`, `libxml2`, `libxslt1.1`
+
+Im Projekt-Dockerfile sind diese Pakete bereits integriert.
+
+### Feature-Hinweise beim Start und Health
+
+Beim Startup prüft die App OCR/Report-Abhängigkeiten und schreibt Hinweise in die Logs.
+Zusätzlich zeigt `GET /health/features` den aktuellen Aktivierungsstatus inkl. fehlender Komponenten (`missing`).
+
 ## Starten
 
 ```bash

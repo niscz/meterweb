@@ -43,6 +43,9 @@ TRANSLATIONS = {
         "month": "Monat",
         "readings": "Ablesungen",
         "reading_not_plausible": "Ablesung ist unplausibel",
+        "photo_reading_invalid_input": "Die Foto-Ablesung enthält ungültige Eingaben. Bitte prüfen Sie Datum und Zählerstand.",
+        "photo_reading_ocr_failed": "Die OCR-Verarbeitung ist fehlgeschlagen. Bitte Foto erneut aufnehmen oder Wert manuell eingeben.",
+        "photo_reading_failed": "Die Foto-Ablesung konnte nicht gespeichert werden. Bitte erneut versuchen.",
     },
     "en": {
         "login_error": "Invalid credentials.",
@@ -86,6 +89,9 @@ TRANSLATIONS = {
         "month": "Month",
         "readings": "Readings",
         "reading_not_plausible": "Reading is not plausible",
+        "photo_reading_invalid_input": "The photo reading contains invalid input. Please verify date and meter value.",
+        "photo_reading_ocr_failed": "OCR processing failed. Please retake the photo or enter the value manually.",
+        "photo_reading_failed": "The photo reading could not be saved. Please try again.",
     },
 }
 

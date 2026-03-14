@@ -140,11 +140,12 @@ Wichtige Umgebungsvariablen:
 - `WEATHER_BASE_URL` (Standard: `https://api.brightsky.dev`)
 - `DEFAULT_LOCALE` (z. B. `de-DE`)
 - `DEFAULT_TIMEZONE` (z. B. `Europe/Berlin`)
+- `UPLOADS_DIR` (Standard: `/uploads`, Pfad für hochgeladene Zählerfotos)
 
 Persistente Volumes (Compose):
 
 - `app_data` (SQLite-Daten)
-- `uploads` (Bilder/OCR-Dateien)
+- `uploads` (Bilder/OCR-Dateien, gemountet nach `${UPLOADS_DIR}`; Default `/uploads`)
 - `reports` (generierte Reports)
 - `backups` (Sicherungen)
 

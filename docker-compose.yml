@@ -12,6 +12,7 @@ services:
       WEATHER_BASE_URL: ${WEATHER_BASE_URL:-https://api.brightsky.dev}
       DEFAULT_LOCALE: ${DEFAULT_LOCALE:-de-DE}
       DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Europe/Berlin}
+      UPLOADS_DIR: ${UPLOADS_DIR:-/uploads}
     command: >-
       sh -c "python -m meterweb.bootstrap &&
              uvicorn meterweb.main:app --host 0.0.0.0 --port 8000"
@@ -37,6 +38,7 @@ services:
       WEATHER_BASE_URL: ${WEATHER_BASE_URL:-https://api.brightsky.dev}
       DEFAULT_LOCALE: ${DEFAULT_LOCALE:-de-DE}
       DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Europe/Berlin}
+      UPLOADS_DIR: ${UPLOADS_DIR:-/uploads}
     command: >-
       sh -c "python -m meterweb.bootstrap &&
              python -m meterweb.worker"

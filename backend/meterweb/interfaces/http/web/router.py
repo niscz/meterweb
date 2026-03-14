@@ -1,3 +1,4 @@
+import os
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -40,7 +41,7 @@ from meterweb.interfaces.http.dependencies import (
 templates = Jinja2Templates(directory="meterweb/templates")
 router = APIRouter(tags=["web"])
 
-UPLOAD_DIR = Path("/data/uploads")
+UPLOAD_DIR = Path(os.getenv("UPLOADS_DIR", "/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

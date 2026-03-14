@@ -49,6 +49,23 @@ def test_create_app_fails_for_placeholder_secret_key(monkeypatch) -> None:
         validate_runtime_security_config()
 
 
+def test_create_app_accepts_secret_key_containing_example_substring(monkeypatch) -> None:
+    monkeypatch.setenv("SECRET_KEY", "MyExampleSecret123!MitZusatzLang")
+    monkeypatch.setenv("ADMIN_USERNAME", "admin_user")
+    monkeypatch.setenv("ADMIN_PASSWORD", "SehrSicheresPasswort123!")
+
+    validate_runtime_security_config()
+
+
+def test_create_app_fails_for_angle_bracket_placeholder_secret_key(monkeypatch) -> None:
+    monkeypatch.setenv("SECRET_KEY", "<SET_A_SECURE_SECRET_KEY>")
+    monkeypatch.setenv("ADMIN_USERNAME", "admin_user")
+    monkeypatch.setenv("ADMIN_PASSWORD", "SehrSicheresPasswort123!")
+
+    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+        validate_runtime_security_config()
+
+
 def test_env_authenticator_uses_hashed_password(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("ADMIN_USERNAME", "admin_user")
     monkeypatch.setenv("ADMIN_PASSWORD", "SehrSicheresPasswort123!")

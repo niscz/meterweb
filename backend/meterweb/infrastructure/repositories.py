@@ -1,4 +1,6 @@
 import json
+import logging
+import tempfile
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -20,6 +22,9 @@ from meterweb.infrastructure.sqlalchemy_models import (
     ReadingRecord,
     UnitRecord,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class SqlAlchemyBuildingRepository(BuildingRepository):
@@ -260,9 +265,18 @@ class JsonWeatherStationRepository(WeatherStationRepository):
             payload.pop(str(building_id), None)
         else:
             payload[str(building_id)] = station_id
-        self._storage_file.write_text(json.dumps(payload), encoding="utf-8")
+
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=self._storage_file.parent, delete=False) as handle:
+            handle.write(json.dumps(payload))
+            temp_path = Path(handle.name)
+
+        temp_path.replace(self._storage_file)
 
     def _load(self) -> dict[str, str]:
         if not self._storage_file.exists():
             return {}
-        return json.loads(self._storage_file.read_text(encoding="utf-8"))
+        try:
+            return json.loads(self._storage_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            logger.warning("Could not read weather station overrides from %s", self._storage_file)
+            return {}

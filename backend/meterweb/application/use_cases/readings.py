@@ -136,11 +136,14 @@ class AddPhotoReadingUseCase:
             self._uow.rollback()
             raise
 
-        plausibility = evaluate_reading_plausibility(
-            self._uow.reading_repository,
-            data.meter_register_id,
-            ocr_confidence=ocr_confidence,
-        )
+        try:
+            plausibility = evaluate_reading_plausibility(
+                self._uow.reading_repository,
+                data.meter_register_id,
+                ocr_confidence=ocr_confidence,
+            )
+        except Exception:
+            plausibility = ReadingPlausibilityResult(plausible=True, warning=None)
         return (
             ReadingViewDTO(
                 id=created.id,

@@ -167,3 +167,28 @@ def test_reading_status_transitions() -> None:
     assert corrected.value == Decimal("321")
     assert accepted.ocr_status == "accepted"
     assert rejected.ocr_status == "rejected"
+
+
+def test_add_photo_reading_ignores_plausibility_errors_after_commit(monkeypatch) -> None:
+    uow = _FakeUnitOfWork()
+
+    def _raise_eval(_repo, _meter_register_id, ocr_confidence=None):
+        assert uow.state[-1] == "commit"
+        raise RuntimeError("temporary repository issue")
+
+    monkeypatch.setattr(readings_module, "evaluate_reading_plausibility", _raise_eval)
+
+    use_case = AddPhotoReadingUseCase(uow, _FakeOCRRunUseCase())
+    meter_register_id = uuid4()
+    result, _ocr_result, plausibility = use_case.execute(
+        PhotoReadingCreateDTO(
+            meter_register_id=meter_register_id,
+            measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            image_path="/tmp/mock.jpg",
+        )
+    )
+
+    assert result.id is not None
+    assert result.plausible is True
+    assert plausibility.plausible is True
+    assert plausibility.warning is None

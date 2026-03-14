@@ -1,6 +1,7 @@
 import io
 import json
 from datetime import date
+from urllib.parse import parse_qs, urlparse
 from urllib.error import URLError
 
 import pytest
@@ -179,3 +180,99 @@ def test_get_series_rejects_invalid_input_before_http_call(tmp_path, monkeypatch
 
     with pytest.raises(ValueError, match="start_date muss <= end_date sein"):
         provider.get_series(52.52, 13.405, date(2025, 1, 2), date(2025, 1, 1), "daily")
+
+
+@pytest.mark.parametrize("station_id", [None, "", "   "])
+def test_get_daily_snapshot_omits_station_parameter_for_auto_mode(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, station_id: str | None
+) -> None:
+    provider = BrightSkyWeatherProvider(cache_dir=tmp_path)
+    captured_urls: list[str] = []
+
+    def _fake_urlopen(url: str, timeout: float):
+        captured_urls.append(url)
+        del timeout
+        return io.StringIO(json.dumps({"weather": [{"temperature": 10.0, "cloud_cover": 20.0}]}))
+
+    monkeypatch.setattr("meterweb.infrastructure.providers.weather.urlopen", _fake_urlopen)
+
+    snapshot = provider.get_daily_snapshot(52.52, 13.405, date(2025, 1, 3), station_id=station_id)
+
+    assert snapshot.temperature_c == 10.0
+    query = parse_qs(urlparse(captured_urls[0]).query)
+    assert "dwd_station_id" not in query
+    assert (tmp_path / "52.5200_13.4050_2025-01-03_auto.json").exists()
+
+
+def test_get_daily_snapshot_includes_station_parameter_for_manual_station(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = BrightSkyWeatherProvider(cache_dir=tmp_path)
+    captured_urls: list[str] = []
+
+    def _fake_urlopen(url: str, timeout: float):
+        captured_urls.append(url)
+        del timeout
+        return io.StringIO(json.dumps({"weather": [{"temperature": 10.0, "cloud_cover": 20.0}]}))
+
+    monkeypatch.setattr("meterweb.infrastructure.providers.weather.urlopen", _fake_urlopen)
+
+    provider.get_daily_snapshot(52.52, 13.405, date(2025, 1, 3), station_id="  12345  ")
+
+    query = parse_qs(urlparse(captured_urls[0]).query)
+    assert query["dwd_station_id"] == ["12345"]
+    assert (tmp_path / "52.5200_13.4050_2025-01-03_12345.json").exists()
+
+
+@pytest.mark.parametrize("station_id", [None, "", "   "])
+def test_get_series_omits_station_parameter_for_auto_mode(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, station_id: str | None
+) -> None:
+    provider = BrightSkyWeatherProvider(cache_dir=tmp_path)
+    captured_urls: list[str] = []
+
+    def _fake_urlopen(url: str, timeout: float):
+        captured_urls.append(url)
+        del timeout
+        return io.StringIO(
+            json.dumps(
+                {
+                    "weather": [
+                        {"timestamp": "2025-01-03T00:00:00+00:00", "temperature": 7.0, "cloud_cover": 11.0},
+                    ]
+                }
+            )
+        )
+
+    monkeypatch.setattr("meterweb.infrastructure.providers.weather.urlopen", _fake_urlopen)
+
+    points = provider.get_series(52.52, 13.405, date(2025, 1, 3), date(2025, 1, 3), "hourly", station_id=station_id)
+
+    assert len(points) == 1
+    query = parse_qs(urlparse(captured_urls[0]).query)
+    assert "dwd_station_id" not in query
+    assert (tmp_path / "series_52.5200_13.4050_2025-01-03_2025-01-03_hourly_auto.json").exists()
+
+
+def test_get_series_includes_station_parameter_for_manual_station(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = BrightSkyWeatherProvider(cache_dir=tmp_path)
+    captured_urls: list[str] = []
+
+    def _fake_urlopen(url: str, timeout: float):
+        captured_urls.append(url)
+        del timeout
+        return io.StringIO(
+            json.dumps(
+                {
+                    "weather": [
+                        {"timestamp": "2025-01-03T00:00:00+00:00", "temperature": 7.0, "cloud_cover": 11.0},
+                    ]
+                }
+            )
+        )
+
+    monkeypatch.setattr("meterweb.infrastructure.providers.weather.urlopen", _fake_urlopen)
+
+    provider.get_series(52.52, 13.405, date(2025, 1, 3), date(2025, 1, 3), "hourly", station_id="  12345  ")
+
+    query = parse_qs(urlparse(captured_urls[0]).query)
+    assert query["dwd_station_id"] == ["12345"]
+    assert (tmp_path / "series_52.5200_13.4050_2025-01-03_2025-01-03_hourly_12345.json").exists()

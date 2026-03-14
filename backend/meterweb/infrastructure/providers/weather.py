@@ -46,7 +46,8 @@ class BrightSkyWeatherProvider(WeatherProvider):
         return station_id_str
 
     def get_daily_snapshot(self, latitude: float, longitude: float, day: date, station_id: str | None = None) -> WeatherSnapshot:
-        cache_file = self._cache_file(latitude, longitude, day, station_id)
+        normalized_station_id = self._normalize_station_id(station_id)
+        cache_file = self._cache_file(latitude, longitude, day, normalized_station_id)
         payload = self._read_cache(cache_file)
         if payload:
             return WeatherSnapshot(
@@ -55,15 +56,16 @@ class BrightSkyWeatherProvider(WeatherProvider):
                 cloud_cover_percent=payload["cloud_cover_percent"],
             )
 
-        params = urlencode(
-            {
-                "lat": latitude,
-                "lon": longitude,
-                "date": day.isoformat(),
-                "last_date": day.isoformat(),
-                "dwd_station_id": station_id,
-            }
-        )
+        params_payload = {
+            "lat": latitude,
+            "lon": longitude,
+            "date": day.isoformat(),
+            "last_date": day.isoformat(),
+        }
+        if normalized_station_id is not None:
+            params_payload["dwd_station_id"] = normalized_station_id
+
+        params = urlencode(params_payload)
         url = f"{self._base_url}/weather?{params}"
         try:
             with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
@@ -103,20 +105,23 @@ class BrightSkyWeatherProvider(WeatherProvider):
         station_id: str | None = None,
     ) -> list[WeatherSeriesPoint]:
         self._validate_series_input(latitude, longitude, start_date, end_date, resolution)
-        cache_file = self._cache_dir / f"series_{latitude:.4f}_{longitude:.4f}_{start_date.isoformat()}_{end_date.isoformat()}_{resolution}_{station_id or 'auto'}.json"
+        normalized_station_id = self._normalize_station_id(station_id)
+        station_key = normalized_station_id or "auto"
+        cache_file = self._cache_dir / f"series_{latitude:.4f}_{longitude:.4f}_{start_date.isoformat()}_{end_date.isoformat()}_{resolution}_{station_key}.json"
         cached = self._read_cache(cache_file)
         if cached:
             return [WeatherSeriesPoint(**item) for item in cached]
 
-        params = urlencode(
-            {
-                "lat": latitude,
-                "lon": longitude,
-                "date": start_date.isoformat(),
-                "last_date": end_date.isoformat(),
-                "dwd_station_id": station_id,
-            }
-        )
+        params_payload = {
+            "lat": latitude,
+            "lon": longitude,
+            "date": start_date.isoformat(),
+            "last_date": end_date.isoformat(),
+        }
+        if normalized_station_id is not None:
+            params_payload["dwd_station_id"] = normalized_station_id
+
+        params = urlencode(params_payload)
         url = f"{self._base_url}/weather?{params}"
         try:
             with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
@@ -185,6 +190,16 @@ class BrightSkyWeatherProvider(WeatherProvider):
         station_key = station_id or "auto"
         key = f"{latitude:.4f}_{longitude:.4f}_{day.isoformat()}_{station_key}.json"
         return self._cache_dir / key
+
+    def _normalize_station_id(self, station_id: str | None) -> str | None:
+        if station_id is None:
+            return None
+
+        normalized_station_id = station_id.strip()
+        if not normalized_station_id:
+            return None
+
+        return normalized_station_id
 
     def _read_cache(self, cache_file: Path) -> dict | list | None:
         if not cache_file.exists():

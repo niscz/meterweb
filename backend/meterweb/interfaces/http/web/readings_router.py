@@ -28,7 +28,6 @@ templates = create_templates()
 router = APIRouter(tags=["web-readings"])
 
 UPLOAD_DIR = get_container().settings.uploads_dir
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def _dashboard_response(
     request: Request,

@@ -49,3 +49,21 @@ def test_analytics_skips_negative_deltas() -> None:
 
     assert result.consumption == Decimal("30")
     assert result.cost == Decimal("15.0")
+
+
+def test_analytics_for_meter_point_groups_interleaved_registers() -> None:
+    ht = uuid4()
+    nt = uuid4()
+    readings = [
+        Reading(id=uuid4(), meter_register_id=ht, measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc), value=Decimal("100")),
+        Reading(id=uuid4(), meter_register_id=nt, measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc), value=Decimal("50")),
+        Reading(id=uuid4(), meter_register_id=ht, measured_at=datetime(2025, 2, 1, tzinfo=timezone.utc), value=Decimal("120")),
+        Reading(id=uuid4(), meter_register_id=nt, measured_at=datetime(2025, 2, 1, tzinfo=timezone.utc), value=Decimal("70")),
+    ]
+    use_case = AnalyticsUseCase(FakeReadingRepository(readings))
+
+    result = use_case.execute_for_meter_point(uuid4(), Decimal("0.5"))
+
+    assert result.consumption == Decimal("40")
+    assert result.cost == Decimal("20.0")
+    assert result.scope == "meter_point"

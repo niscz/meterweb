@@ -1,8 +1,9 @@
+from collections import defaultdict
 from decimal import Decimal
 from uuid import UUID
 
 from meterweb.application.ports import ReadingRepository, ReportRenderer
-from meterweb.domain.metering import consumption_from_absolute_readings
+from meterweb.domain.metering import Reading, consumption_from_absolute_readings
 
 
 class ExportUseCase:
@@ -36,7 +37,6 @@ class ExportUseCase:
         rows = self.monthly_rows_for_meter_register(meter_register_id)
         return self._report_renderer.render_pdf_template("reports/monthly_report_pdf.html", {"rows": rows})
 
-
     def export_csv_for_building(self, building_id: UUID) -> bytes:
         return self._report_renderer.render_csv(self.monthly_rows_for_building(building_id))
 
@@ -61,8 +61,8 @@ class ExportUseCase:
         )
 
 
-def _monthly_rows(readings) -> list[dict[str, str]]:
-    grouped: dict[str, list] = {}
+def _monthly_rows(readings: list[Reading]) -> list[dict[str, str]]:
+    grouped: dict[str, list[Reading]] = {}
     for reading in readings:
         key = reading.measured_at.strftime("%Y-%m")
         grouped.setdefault(key, []).append(reading)
@@ -70,14 +70,17 @@ def _monthly_rows(readings) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for month, month_readings in sorted(grouped.items()):
         consumption = Decimal("0")
-        ordered = sorted(month_readings, key=lambda r: (r.measured_at, r.id))
-        for prev, current in zip(ordered, ordered[1:]):
-            if prev.meter_register_id != current.meter_register_id:
-                continue
-            try:
-                consumption += consumption_from_absolute_readings(prev.value, current.value)
-            except ValueError:
-                continue
+        by_register: dict[UUID, list[Reading]] = defaultdict(list)
+        for reading in month_readings:
+            by_register[reading.meter_register_id].append(reading)
+
+        for register_readings in by_register.values():
+            ordered = sorted(register_readings, key=lambda r: (r.measured_at, r.id))
+            for prev, current in zip(ordered, ordered[1:]):
+                try:
+                    consumption += consumption_from_absolute_readings(prev.value, current.value)
+                except ValueError:
+                    continue
         rows.append(
             {
                 "month": month,

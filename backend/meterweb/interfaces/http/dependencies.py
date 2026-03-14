@@ -12,7 +12,15 @@ from meterweb.application.use_cases.buildings import (
     ListUnitsUseCase,
 )
 from meterweb.application.use_cases.exports import ExportUseCase
-from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, AddReadingUseCase, OCRRunUseCase
+from meterweb.application.use_cases.readings import (
+    AddPhotoReadingUseCase,
+    AddReadingUseCase,
+    ConfirmReadingUseCase,
+    CorrectReadingUseCase,
+    OCRAcceptUseCase,
+    OCRRejectUseCase,
+    OCRRunUseCase,
+)
 from meterweb.application.use_cases.weather import WeatherSyncUseCase
 from meterweb.bootstrap import AppContainer, get_container
 from meterweb.infrastructure.db import get_session
@@ -102,3 +110,31 @@ def get_analytics_use_case(
     app_container: AppContainer = Depends(container),
 ) -> AnalyticsUseCase:
     return app_container.analytics_use_case(session)
+
+
+def get_confirm_reading_use_case(
+    session: Session = Depends(get_session),
+    app_container: AppContainer = Depends(container),
+) -> ConfirmReadingUseCase:
+    return app_container.confirm_reading_use_case(session)
+
+
+def get_correct_reading_use_case(
+    session: Session = Depends(get_session),
+    app_container: AppContainer = Depends(container),
+) -> CorrectReadingUseCase:
+    return app_container.correct_reading_use_case(session)
+
+
+def get_ocr_accept_use_case(
+    session: Session = Depends(get_session),
+    app_container: AppContainer = Depends(container),
+) -> OCRAcceptUseCase:
+    return app_container.ocr_accept_use_case(session)
+
+
+def get_ocr_reject_use_case(
+    session: Session = Depends(get_session),
+    app_container: AppContainer = Depends(container),
+) -> OCRRejectUseCase:
+    return app_container.ocr_reject_use_case(session)

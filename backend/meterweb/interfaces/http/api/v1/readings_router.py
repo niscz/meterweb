@@ -4,15 +4,20 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from meterweb.application.dto import ReadingCreateDTO
+from meterweb.application.dto import OCRDecisionDTO, ReadingCreateDTO
 from meterweb.application.use_cases.exports import ExportUseCase
-from meterweb.application.use_cases.readings import AddReadingUseCase
+from meterweb.application.use_cases.readings import AddReadingUseCase, ConfirmReadingUseCase, CorrectReadingUseCase
 from meterweb.infrastructure.db import get_session
 from meterweb.infrastructure.repositories import SqlAlchemyReadingRepository
 from meterweb.interfaces.http.common import require_auth
-from meterweb.interfaces.http.dependencies import get_add_reading_use_case, get_export_use_case
+from meterweb.interfaces.http.dependencies import (
+    get_add_reading_use_case,
+    get_confirm_reading_use_case,
+    get_correct_reading_use_case,
+    get_export_use_case,
+)
 from meterweb.interfaces.http.mappers import to_reading_response
-from meterweb.interfaces.http.schemas import ReadingCreateRequest, ReadingResponse
+from meterweb.interfaces.http.schemas import ReadingCorrectRequest, ReadingCreateRequest, ReadingResponse
 
 router = APIRouter(tags=["v1-readings"])
 
@@ -51,3 +56,26 @@ def export_xlsx(request: Request, meter_point_id: UUID, use_case: ExportUseCase 
 def export_pdf(request: Request, meter_point_id: UUID, use_case: ExportUseCase = Depends(get_export_use_case)):
     require_auth(request)
     return Response(content=use_case.export_pdf(meter_point_id), media_type="application/pdf")
+
+
+@router.post("/readings/{reading_id}/confirm", response_model=ReadingResponse)
+def confirm_reading(
+    request: Request,
+    reading_id: UUID,
+    use_case: ConfirmReadingUseCase = Depends(get_confirm_reading_use_case),
+):
+    require_auth(request)
+    updated = use_case.execute(OCRDecisionDTO(reading_id=reading_id))
+    return to_reading_response(updated)
+
+
+@router.post("/readings/{reading_id}/correct", response_model=ReadingResponse)
+def correct_reading(
+    request: Request,
+    reading_id: UUID,
+    payload: ReadingCorrectRequest,
+    use_case: CorrectReadingUseCase = Depends(get_correct_reading_use_case),
+):
+    require_auth(request)
+    updated = use_case.execute(OCRDecisionDTO(reading_id=reading_id, value=payload.value))
+    return to_reading_response(updated)

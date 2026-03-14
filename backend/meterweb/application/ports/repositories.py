@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from meterweb.domain.building import Building
+from meterweb.application.dto import OCRCandidateDTO, ReadingOCRMetadataDTO
 from meterweb.domain.metering import MeterPoint, Reading, Unit
 
 
@@ -55,7 +56,31 @@ class ReadingRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def add_photo(self, meter_register_id: UUID, measured_at: datetime, value: Decimal, image_path: str, ocr_confidence: float) -> Reading:
+    def add_photo(
+        self,
+        meter_register_id: UUID,
+        measured_at: datetime,
+        value: Decimal,
+        image_path: str,
+        ocr_confidence: float,
+        ocr_text: str,
+        ocr_candidates: list[OCRCandidateDTO],
+        ocr_status: str = "suggested",
+    ) -> Reading:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_ocr_status(
+        self,
+        reading_id: UUID,
+        *,
+        status: str,
+        corrected_value: Decimal | None = None,
+    ) -> Reading:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_ocr_metadata(self, reading_id: UUID) -> ReadingOCRMetadataDTO:
         raise NotImplementedError
 
     @abstractmethod

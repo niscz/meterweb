@@ -5,23 +5,78 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import meterweb.application.use_cases.readings as readings_module
-from meterweb.application.dto import PhotoReadingCreateDTO, ReadingCreateDTO
-from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, AddReadingUseCase
+from meterweb.application.dto import OCRCandidateDTO, OCRDecisionDTO, PhotoReadingCreateDTO, ReadingCreateDTO
+from meterweb.application.use_cases.readings import (
+    AddPhotoReadingUseCase,
+    AddReadingUseCase,
+    ConfirmReadingUseCase,
+    CorrectReadingUseCase,
+    OCRAcceptUseCase,
+    OCRRejectUseCase,
+)
 
 
 @dataclass
 class _FakeReading:
     id: UUID
+    meter_register_id: UUID
     measured_at: datetime
     value: Decimal
 
 
 class _FakeReadingRepository:
-    def add_manual(self, _meter_register_id: UUID, measured_at: datetime, value: Decimal) -> _FakeReading:
-        return _FakeReading(id=uuid4(), measured_at=measured_at, value=value)
+    def __init__(self) -> None:
+        self.last_status = "suggested"
 
-    def add_photo(self, _meter_register_id: UUID, measured_at: datetime, value: Decimal, _image_path: str, _ocr_confidence: float) -> _FakeReading:
-        return _FakeReading(id=uuid4(), measured_at=measured_at, value=value)
+    def add_manual(self, _meter_register_id: UUID, measured_at: datetime, value: Decimal) -> _FakeReading:
+        return _FakeReading(id=uuid4(), meter_register_id=_meter_register_id, measured_at=measured_at, value=value)
+
+    def add_photo(
+        self,
+        _meter_register_id: UUID,
+        measured_at: datetime,
+        value: Decimal,
+        _image_path: str,
+        _ocr_confidence: float,
+        _ocr_text: str,
+        _ocr_candidates: list[OCRCandidateDTO],
+        ocr_status: str = "suggested",
+    ) -> _FakeReading:
+        return _FakeReading(id=uuid4(), meter_register_id=_meter_register_id, measured_at=measured_at, value=value)
+
+    def update_ocr_status(self, reading_id: UUID, *, status: str, corrected_value: Decimal | None = None) -> _FakeReading:
+        self.last_status = status
+        return _FakeReading(
+            id=reading_id,
+            meter_register_id=uuid4(),
+            measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            value=corrected_value or Decimal("123"),
+        )
+
+    def list_for_meter_register(self, _meter_register_id: UUID):
+        return [
+            _FakeReading(
+                id=uuid4(),
+                meter_register_id=_meter_register_id,
+                measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+                value=Decimal("100"),
+            ),
+            _FakeReading(
+                id=uuid4(),
+                meter_register_id=_meter_register_id,
+                measured_at=datetime(2025, 1, 2, tzinfo=timezone.utc),
+                value=Decimal("123"),
+            ),
+        ]
+
+    def get_ocr_metadata(self, _reading_id: UUID):
+        return SimpleNamespace(
+            image_path="/tmp/mock.jpg",
+            ocr_confidence=0.9,
+            ocr_text="123",
+            ocr_candidates=[OCRCandidateDTO(value=Decimal("123"), confidence=0.9)],
+            ocr_status=self.last_status,
+        )
 
 
 class _FakeUnitOfWork:
@@ -97,3 +152,18 @@ def test_add_photo_reading_commits_before_plausibility(monkeypatch) -> None:
     assert observed["state_before_eval"] == "commit"
     assert result.plausible is True
     assert plausibility.warning is None
+
+
+def test_reading_status_transitions() -> None:
+    uow = _FakeUnitOfWork()
+    reading_id = uuid4()
+
+    confirmed = ConfirmReadingUseCase(uow).execute(OCRDecisionDTO(reading_id=reading_id))
+    corrected = CorrectReadingUseCase(uow).execute(OCRDecisionDTO(reading_id=reading_id, value=Decimal("321")))
+    accepted = OCRAcceptUseCase(uow).execute(OCRDecisionDTO(reading_id=reading_id))
+    rejected = OCRRejectUseCase(uow).execute(OCRDecisionDTO(reading_id=reading_id))
+
+    assert confirmed.value == Decimal("123")
+    assert corrected.value == Decimal("321")
+    assert accepted.ocr_status == "accepted"
+    assert rejected.ocr_status == "rejected"

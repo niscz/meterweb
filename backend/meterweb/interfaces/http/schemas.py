@@ -41,6 +41,11 @@ class PhotoReadingCreateRequest(BaseModel):
     confirmed_value: Decimal | None = Field(default=None, gt=Decimal("0"))
 
 
+
+
+class ReadingCorrectRequest(BaseModel):
+    value: Decimal = Field(gt=Decimal("0"))
+
 class WeatherStationSelectRequest(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
@@ -110,6 +115,15 @@ class PhotoReadingResponse(BaseModel):
     ocr_result: OCRRunResponse
     plausibility_warning: str | None
 
+
+
+
+class OCRMetadataResponse(BaseModel):
+    image_path: str | None
+    ocr_confidence: float | None
+    ocr_text: str | None
+    candidates: list[OCRCandidateResponse]
+    status: str
 
 class WeatherStationResponse(BaseModel):
     station_id: str

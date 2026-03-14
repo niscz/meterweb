@@ -1,7 +1,9 @@
+import json
 from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI, status
+from sqlalchemy.exc import IntegrityError
 from starlette.requests import Request
 
 from meterweb.application.dto import UnitViewDTO
@@ -110,3 +112,16 @@ async def test_upstream_service_error_maps_to_bad_gateway() -> None:
 
     assert response.status_code == status.HTTP_502_BAD_GATEWAY
     assert response.body == b'{"detail":"Bright Sky Wetterserienabruf fehlgeschlagen."}'
+
+
+@pytest.mark.anyio
+async def test_integrity_error_maps_to_conflict() -> None:
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    handler = app.exception_handlers[IntegrityError]
+    request = Request({"type": "http", "method": "POST", "path": "/api/v1/units", "headers": [], "query_string": b""})
+    response = await handler(request, IntegrityError("statement", "params", Exception("fk failed")))
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert json.loads(response.body) == {"detail": "Datenintegrität verletzt."}

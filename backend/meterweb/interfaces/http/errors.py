@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, status
+from sqlalchemy.exc import IntegrityError
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -23,6 +24,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(UpstreamServiceError)
     async def upstream_service_error_handler(_: Request, exc: UpstreamServiceError) -> JSONResponse:
         return _json_error(status.HTTP_502_BAD_GATEWAY, str(exc) or "Upstream service unavailable.")
+
+    @app.exception_handler(IntegrityError)
+    async def integrity_error_handler(_: Request, __: IntegrityError) -> JSONResponse:
+        return _json_error(status.HTTP_409_CONFLICT, "Datenintegrität verletzt.")
 
     @app.exception_handler(ValueError)
     async def value_error_handler(_: Request, exc: ValueError) -> JSONResponse:

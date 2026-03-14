@@ -23,6 +23,7 @@ def configure_database(database_url: str | None = None) -> None:
             cursor.execute("PRAGMA journal_mode=WAL;")
             cursor.execute("PRAGMA synchronous=NORMAL;")
             cursor.execute("PRAGMA busy_timeout=5000;")
+            cursor.execute("PRAGMA foreign_keys=ON;")
             cursor.close()
 
     _SessionLocal = sessionmaker(bind=_engine, autocommit=False, autoflush=False)

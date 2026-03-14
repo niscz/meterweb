@@ -17,6 +17,9 @@ class AppSettings:
     ocr_language: str = "deu"
     chart_adapter: str = "apexcharts"
     report_renderer: str = "weasyprint"
+    login_max_attempts: int = 5
+    login_attempt_window_seconds: int = 300
+    login_lock_duration_seconds: int = 300
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -32,6 +35,9 @@ class AppSettings:
             ocr_language=os.getenv("OCR_LANGUAGE", "deu"),
             chart_adapter=os.getenv("CHART_ADAPTER", "apexcharts"),
             report_renderer=os.getenv("REPORT_RENDERER", "weasyprint"),
+            login_max_attempts=_env_int("LOGIN_MAX_ATTEMPTS", 5),
+            login_attempt_window_seconds=_env_int("LOGIN_ATTEMPT_WINDOW_SECONDS", 300),
+            login_lock_duration_seconds=_env_int("LOGIN_LOCK_DURATION_SECONDS", 300),
         )
 
     def provider_config(self) -> ProviderConfig:
@@ -44,3 +50,13 @@ class AppSettings:
             chart_adapter=self.chart_adapter,
             report_renderer=self.report_renderer,
         )
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    value = int(raw)
+    if value <= 0:
+        raise RuntimeError(f"Environment variable {name} must be greater than 0")
+    return value

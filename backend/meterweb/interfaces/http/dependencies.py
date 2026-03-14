@@ -1,3 +1,4 @@
+from functools import lru_cache
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
@@ -25,6 +26,7 @@ from meterweb.application.use_cases.weather import WeatherSyncUseCase
 from meterweb.bootstrap import AppContainer, get_container
 from meterweb.infrastructure.db import get_session
 from meterweb.infrastructure.settings import AppSettings
+from meterweb.interfaces.http.web.auth_security import LoginAttemptGuard
 
 
 def container() -> AppContainer:
@@ -37,6 +39,16 @@ def get_app_settings(app_container: AppContainer = Depends(container)) -> AppSet
 
 def get_login_use_case(app_container: AppContainer = Depends(container)) -> LoginUseCase:
     return app_container.login_use_case()
+
+
+@lru_cache
+def get_login_attempt_guard() -> LoginAttemptGuard:
+    settings = container().settings
+    return LoginAttemptGuard(
+        max_attempts=settings.login_max_attempts,
+        window_seconds=settings.login_attempt_window_seconds,
+        lock_duration_seconds=settings.login_lock_duration_seconds,
+    )
 
 
 def get_create_building_use_case(

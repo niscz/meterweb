@@ -73,11 +73,11 @@ def create_photo_reading(
 @router.post("/ocr/{reading_id}/accept", response_model=OCRMetadataResponse)
 def accept_ocr(
     request: Request,
-    reading_id: str,
+    reading_id: UUID,
     use_case: OCRAcceptUseCase = Depends(get_ocr_accept_use_case),
 ):
     require_auth(request)
-    metadata = use_case.execute(OCRDecisionDTO(reading_id=UUID(reading_id)))
+    metadata = use_case.execute(OCRDecisionDTO(reading_id=reading_id))
     return OCRMetadataResponse(
         image_path=metadata.image_path,
         ocr_confidence=metadata.ocr_confidence,
@@ -90,11 +90,11 @@ def accept_ocr(
 @router.post("/ocr/{reading_id}/reject", response_model=OCRMetadataResponse)
 def reject_ocr(
     request: Request,
-    reading_id: str,
+    reading_id: UUID,
     use_case: OCRRejectUseCase = Depends(get_ocr_reject_use_case),
 ):
     require_auth(request)
-    metadata = use_case.execute(OCRDecisionDTO(reading_id=UUID(reading_id)))
+    metadata = use_case.execute(OCRDecisionDTO(reading_id=reading_id))
     return OCRMetadataResponse(
         image_path=metadata.image_path,
         ocr_confidence=metadata.ocr_confidence,

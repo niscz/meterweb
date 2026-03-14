@@ -31,12 +31,12 @@ UPLOAD_DIR = get_container().settings.uploads_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _resolve_register_id(session: Session, meter_register_id: str | None, meter_point_id: str | None) -> UUID:
+def _resolve_register_id(session: Session, meter_register_id: UUID | None, meter_point_id: UUID | None) -> UUID:
     if meter_register_id:
-        return UUID(meter_register_id)
+        return meter_register_id
     if not meter_point_id:
         raise ValueError("Bitte Messpunkt oder Zählwerk angeben.")
-    register_id = SqlAlchemyReadingRepository(session).get_current_register_for_meter_point(UUID(meter_point_id))
+    register_id = SqlAlchemyReadingRepository(session).get_current_register_for_meter_point(meter_point_id)
     if register_id is None:
         raise ValueError("Messpunkt hat kein aktives Register.")
     return register_id
@@ -45,8 +45,8 @@ def _resolve_register_id(session: Session, meter_register_id: str | None, meter_
 @router.post("/dashboard/readings")
 def create_reading(
     request: Request,
-    meter_register_id: str | None = Form(default=None),
-    meter_point_id: str | None = Form(default=None),
+    meter_register_id: UUID | None = Form(default=None),
+    meter_point_id: UUID | None = Form(default=None),
     measured_at: str = Form(),
     value: str = Form(),
     add_reading_use_case: AddReadingUseCase = Depends(get_add_reading_use_case),
@@ -71,7 +71,7 @@ def create_reading(
                 value=parsed_value,
             )
         )
-        analytics = analytics_use_case.execute(UUID(meter_point_id), Decimal("0.35")) if meter_point_id else None
+        analytics = analytics_use_case.execute(meter_point_id, Decimal("0.35")) if meter_point_id else None
     except ValueError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
     return templates.TemplateResponse(
@@ -93,8 +93,8 @@ def create_reading(
 @router.post("/dashboard/readings/photo")
 async def create_photo_reading(
     request: Request,
-    meter_register_id: str | None = Form(default=None),
-    meter_point_id: str | None = Form(default=None),
+    meter_register_id: UUID | None = Form(default=None),
+    meter_point_id: UUID | None = Form(default=None),
     measured_at: str = Form(),
     value: str | None = Form(default=None),
     photo: UploadFile = File(),
@@ -117,7 +117,7 @@ async def create_photo_reading(
         ),
         confirmed_value=confirmed_value,
     )
-    analytics = analytics_use_case.execute(UUID(meter_point_id), Decimal("0.35")) if meter_point_id else None
+    analytics = analytics_use_case.execute(meter_point_id, Decimal("0.35")) if meter_point_id else None
     return templates.TemplateResponse(
         request,
         "capture_confirm.html",

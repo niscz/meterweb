@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from meterweb.application.use_cases.exports import ExportUseCase
-from meterweb.interfaces.http.common import require_auth
+from meterweb.interfaces.http.common import get_locale, require_auth
 from meterweb.interfaces.http.dependencies import get_export_use_case
 from meterweb.interfaces.http.schemas import ReportExportRequest
 
@@ -65,9 +65,9 @@ def export_pdf(
 ):
     require_auth(request)
     if payload.meter_register_id:
-        return Response(content=use_case.export_pdf_for_meter_register(payload.meter_register_id), media_type="application/pdf")
+        return Response(content=use_case.export_pdf_for_meter_register(payload.meter_register_id, lang=get_locale(request)), media_type="application/pdf")
     if payload.meter_point_id:
-        return Response(content=use_case.export_pdf(payload.meter_point_id), media_type="application/pdf")
+        return Response(content=use_case.export_pdf(payload.meter_point_id, lang=get_locale(request)), media_type="application/pdf")
     if payload.building_id:
-        return Response(content=use_case.export_pdf_for_building(payload.building_id), media_type="application/pdf")
+        return Response(content=use_case.export_pdf_for_building(payload.building_id, lang=get_locale(request)), media_type="application/pdf")
     raise HTTPException(status_code=422, detail="scope required")

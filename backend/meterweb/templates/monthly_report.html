@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Monatsbericht | meterweb{% endblock %}
+{% block title %}{{ t('monthly_report_title') }}{% endblock %}
 {% block content %}
-<h1 class="h2">Monatsbericht je Objekt</h1>
+<h1 class="h2">{{ t('monthly_report_heading') }}</h1>
 <table class="table table-striped">
-  <thead><tr><th>Monat</th><th>Ablesungen</th><th>Verbrauch</th></tr></thead>
+  <thead><tr><th>{{ t('month') }}</th><th>{{ t('readings') }}</th><th>{{ t('consumption') }}</th></tr></thead>
   <tbody>
     {% for row in rows %}
-      <tr><td>{{ row.month }}</td><td>{{ row.readings }}</td><td>{{ row.consumption }}</td></tr>
+      <tr><td>{{ fmt_month(row.month) }}</td><td>{{ fmt_number(row.readings) }}</td><td>{{ fmt_number(row.consumption) }}</td></tr>
     {% endfor %}
   </tbody>
 </table>

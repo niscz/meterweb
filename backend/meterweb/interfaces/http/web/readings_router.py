@@ -4,7 +4,6 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from meterweb.application.dto import PhotoReadingCreateDTO, ReadingCreateDTO
@@ -14,7 +13,8 @@ from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, AddR
 from meterweb.bootstrap import get_container
 from meterweb.infrastructure.db import get_session
 from meterweb.infrastructure.repositories import SqlAlchemyReadingRepository
-from meterweb.interfaces.http.common import get_locale, require_auth
+from meterweb.interfaces.http.common import get_locale, require_auth, translate
+from meterweb.interfaces.http.templating import create_templates
 from meterweb.interfaces.http.dependencies import (
     get_add_photo_reading_use_case,
     get_add_reading_use_case,
@@ -24,7 +24,7 @@ from meterweb.interfaces.http.dependencies import (
     get_list_units_use_case,
 )
 
-templates = Jinja2Templates(directory="meterweb/templates")
+templates = create_templates()
 router = APIRouter(tags=["web-readings"])
 
 UPLOAD_DIR = get_container().settings.uploads_dir
@@ -83,7 +83,7 @@ def create_reading(
             "units": list_units.execute(),
             "meter_points": list_meter_points.execute(),
             "analytics": analytics,
-            "reading_error": None if reading.plausible else "Reading not plausible",
+            "reading_error": None if reading.plausible else translate(get_locale(request), "reading_not_plausible"),
             "building_error": None,
             "ocr_result": None,
         },

@@ -33,9 +33,9 @@ class ExportUseCase:
     def export_xlsx_for_meter_register(self, meter_register_id: UUID) -> bytes:
         return self._report_renderer.render_xlsx(self.monthly_rows_for_meter_register(meter_register_id))
 
-    def export_pdf_for_meter_register(self, meter_register_id: UUID) -> bytes:
+    def export_pdf_for_meter_register(self, meter_register_id: UUID, lang: str = "de") -> bytes:
         rows = self.monthly_rows_for_meter_register(meter_register_id)
-        return self._report_renderer.render_pdf_template("reports/monthly_report_pdf.html", {"rows": rows})
+        return self._report_renderer.render_pdf_template("reports/monthly_report_pdf.html", {"rows": rows, "lang": lang})
 
     def export_csv_for_building(self, building_id: UUID) -> bytes:
         return self._report_renderer.render_csv(self.monthly_rows_for_building(building_id))
@@ -43,9 +43,9 @@ class ExportUseCase:
     def export_xlsx_for_building(self, building_id: UUID) -> bytes:
         return self._report_renderer.render_xlsx(self.monthly_rows_for_building(building_id))
 
-    def export_pdf_for_building(self, building_id: UUID) -> bytes:
+    def export_pdf_for_building(self, building_id: UUID, lang: str = "de") -> bytes:
         rows = self.monthly_rows_for_building(building_id)
-        return self._report_renderer.render_pdf_template("reports/monthly_report_pdf.html", {"rows": rows})
+        return self._report_renderer.render_pdf_template("reports/monthly_report_pdf.html", {"rows": rows, "lang": lang})
 
     def export_csv(self, meter_point_id: UUID) -> bytes:
         return self._report_renderer.render_csv(self.monthly_rows_for_meter_point(meter_point_id))
@@ -53,11 +53,11 @@ class ExportUseCase:
     def export_xlsx(self, meter_point_id: UUID) -> bytes:
         return self._report_renderer.render_xlsx(self.monthly_rows_for_meter_point(meter_point_id))
 
-    def export_pdf(self, meter_point_id: UUID) -> bytes:
+    def export_pdf(self, meter_point_id: UUID, lang: str = "de") -> bytes:
         rows = self.monthly_rows_for_meter_point(meter_point_id)
         return self._report_renderer.render_pdf_template(
             "reports/monthly_report_pdf.html",
-            {"rows": rows},
+            {"rows": rows, "lang": lang},
         )
 
 

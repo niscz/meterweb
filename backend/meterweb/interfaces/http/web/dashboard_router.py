@@ -2,7 +2,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from meterweb.application.dto import BuildingCreateDTO, MeterPointCreateDTO, UnitCreateDTO
 from meterweb.application.use_cases.buildings import (
@@ -14,6 +13,7 @@ from meterweb.application.use_cases.buildings import (
     ListUnitsUseCase,
 )
 from meterweb.interfaces.http.common import get_locale, require_auth
+from meterweb.interfaces.http.templating import create_templates
 from meterweb.interfaces.http.dependencies import (
     get_create_building_use_case,
     get_create_meter_point_use_case,
@@ -23,7 +23,7 @@ from meterweb.interfaces.http.dependencies import (
     get_list_units_use_case,
 )
 
-templates = Jinja2Templates(directory="meterweb/templates")
+templates = create_templates()
 router = APIRouter(tags=["web-dashboard"])
 
 

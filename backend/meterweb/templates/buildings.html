@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Gebäude | meterweb{% endblock %}
+{% block title %}{{ t('buildings_title') }}{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h2">Gebäude</h1>
+  <h1 class="h2">{{ t('buildings_heading') }}</h1>
 </div>
 
 {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
@@ -11,10 +11,10 @@
   <div class="card-body">
     <form method="post" action="/buildings" class="row g-2">
       <div class="col-md-8">
-        <input class="form-control" type="text" name="name" placeholder="Neues Gebäude" required />
+        <input class="form-control" type="text" name="name" placeholder="{{ t('new_building_placeholder') }}" required />
       </div>
       <div class="col-md-4">
-        <button class="btn btn-primary w-100" type="submit">Gebäude anlegen</button>
+        <button class="btn btn-primary w-100" type="submit">{{ t('create_building') }}</button>
       </div>
     </form>
   </div>
@@ -26,7 +26,7 @@
       {% for building in buildings %}
       <li class="list-group-item">{{ building.name }}</li>
       {% else %}
-      <li class="list-group-item text-muted">Noch keine Gebäude vorhanden.</li>
+      <li class="list-group-item text-muted">{{ t('no_buildings') }}</li>
       {% endfor %}
     </ul>
   </div>

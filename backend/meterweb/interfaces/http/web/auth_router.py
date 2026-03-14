@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from meterweb.application.dto import LoginDTO
 from meterweb.application.use_cases.auth import LoginUseCase
 from meterweb.domain.auth import AuthenticationError
 from meterweb.interfaces.http.common import TRANSLATIONS, get_locale
 from meterweb.interfaces.http.dependencies import get_login_use_case
+from meterweb.interfaces.http.templating import create_templates
 
-templates = Jinja2Templates(directory="meterweb/templates")
+templates = create_templates()
 router = APIRouter(tags=["web-auth"])
 
 

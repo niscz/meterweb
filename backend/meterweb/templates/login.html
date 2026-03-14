@@ -1,23 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Login | meterweb{% endblock %}
+{% block title %}{{ t('login_title') }}{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-sm-10 col-md-6 col-lg-4">
-    <div class="text-end mb-2"><a href="?lang=de">DE</a> | <a href="?lang=en">EN</a></div>
+    <div class="text-end mb-2"><a href="?lang=de">{{ t('language_de') }}</a> | <a href="?lang=en">{{ t('language_en') }}</a></div>
     <div class="card">
       <div class="card-body">
-        <h1 class="h3 mb-3">meterweb Login</h1>
+        <h1 class="h3 mb-3">{{ t('login_header') }}</h1>
         {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
         <form method="post" action="/login">
           <div class="mb-3">
-            <label class="form-label">{{ 'Username' if lang == 'en' else 'Benutzername' }}</label>
+            <label class="form-label">{{ t('username') }}</label>
             <input class="form-control" type="text" name="username" required />
           </div>
           <div class="mb-3">
-            <label class="form-label">{{ 'Password' if lang == 'en' else 'Passwort' }}</label>
+            <label class="form-label">{{ t('password') }}</label>
             <input class="form-control" type="password" name="password" required />
           </div>
-          <button class="btn btn-primary w-100" type="submit">{{ 'Sign in' if lang == 'en' else 'Anmelden' }}</button>
+          <button class="btn btn-primary w-100" type="submit">{{ t('sign_in') }}</button>
         </form>
       </div>
     </div>

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, status
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from meterweb.application.dto import BuildingCreateDTO
 from meterweb.application.use_cases.buildings import CreateBuildingUseCase, ListBuildingsUseCase, ListMeterPointsUseCase, ListUnitsUseCase
 from meterweb.interfaces.http.common import get_locale, require_auth
+from meterweb.interfaces.http.templating import create_templates
 from meterweb.interfaces.http.web.auth_router import router as auth_router
 from meterweb.interfaces.http.web.dashboard_router import router as dashboard_router
 from meterweb.interfaces.http.web.readings_router import router as readings_router
@@ -16,7 +16,7 @@ router.include_router(dashboard_router)
 router.include_router(readings_router)
 router.include_router(reports_router)
 
-templates = Jinja2Templates(directory="meterweb/templates")
+templates = create_templates()
 
 
 def create_building(request, name: str, use_case: CreateBuildingUseCase, list_buildings: ListBuildingsUseCase, list_units: ListUnitsUseCase, list_meter_points: ListMeterPointsUseCase):

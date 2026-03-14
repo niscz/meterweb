@@ -146,7 +146,7 @@ class AddPhotoReadingUseCase:
                 data.meter_register_id,
                 ocr_confidence=ocr_confidence,
             )
-        except (RuntimeError, ValueError, ArithmeticError):
+        except Exception:
             logger.warning(
                 "plausibility_check_unavailable meter_register_id=%s reading_id=%s",
                 data.meter_register_id,

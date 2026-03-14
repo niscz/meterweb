@@ -4,6 +4,8 @@ from decimal import Decimal
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
+from sqlalchemy.exc import SQLAlchemyError
+
 import meterweb.application.use_cases.readings as readings_module
 from meterweb.application.dto import OCRCandidateDTO, OCRDecisionDTO, PhotoReadingCreateDTO, ReadingCreateDTO
 from meterweb.application.services.plausibility import PLAUSIBILITY_UNAVAILABLE_WARNING
@@ -196,3 +198,27 @@ def test_add_photo_reading_returns_warning_when_plausibility_check_fails(monkeyp
     assert "plausibility_check_unavailable" in caplog.text
     assert str(meter_register_id) in caplog.text
     assert str(result.id) in caplog.text
+
+
+def test_add_photo_reading_handles_sqlalchemy_plausibility_errors(monkeypatch) -> None:
+    uow = _FakeUnitOfWork()
+
+    def _raise_eval(_repo, _meter_register_id, ocr_confidence=None):
+        assert uow.state[-1] == "commit"
+        raise SQLAlchemyError("db unavailable")
+
+    monkeypatch.setattr(readings_module, "evaluate_reading_plausibility", _raise_eval)
+
+    use_case = AddPhotoReadingUseCase(uow, _FakeOCRRunUseCase())
+    result, _ocr_result, plausibility = use_case.execute(
+        PhotoReadingCreateDTO(
+            meter_register_id=uuid4(),
+            measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            image_path="/tmp/mock.jpg",
+        )
+    )
+
+    assert result.id is not None
+    assert result.plausible is False
+    assert plausibility.plausible is False
+    assert plausibility.warning == PLAUSIBILITY_UNAVAILABLE_WARNING

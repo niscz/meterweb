@@ -5,6 +5,8 @@ from uuid import UUID
 from meterweb.application.ports import ReadingRepository
 from meterweb.domain.metering import evaluate_plausibility
 
+PLAUSIBILITY_UNAVAILABLE_WARNING = "plausibility_unavailable"
+
 
 @dataclass(frozen=True, slots=True)
 class ReadingPlausibilityResult:

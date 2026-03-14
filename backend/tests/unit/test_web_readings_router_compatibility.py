@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException, UploadFile
 
+from meterweb.application.services.plausibility import PLAUSIBILITY_UNAVAILABLE_WARNING
 import meterweb.interfaces.http.web.readings_router as readings_router
 
 
@@ -30,6 +31,16 @@ class _FakeListUseCase:
 class _FakeAnalyticsUseCase:
     def execute(self, *_args, **_kwargs):
         return None
+
+
+
+
+class _SuccessfulPhotoUseCase:
+    def execute(self, data, *_args, **_kwargs):
+        reading = type("Reading", (), {"value": 123, "plausible": False})()
+        ocr_result = type("OCRResult", (), {"text": "123", "best_candidate": None})()
+        plausibility = type("Plausibility", (), {"warning": PLAUSIBILITY_UNAVAILABLE_WARNING})()
+        return reading, ocr_result, plausibility
 
 
 class _RaisingPhotoUseCase:
@@ -180,3 +191,29 @@ def test_save_upload_streaming_cleans_up_when_upload_aborts_mid_stream(tmp_path,
         asyncio.run(_save_upload(readings_router, photo))
 
     assert list(tmp_path.iterdir()) == []
+
+
+def test_create_photo_reading_translates_plausibility_unavailable_warning(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(readings_router, "UPLOAD_DIR", tmp_path)
+    photo = UploadFile(filename="meter.jpg", file=BytesIO(b"img"), headers={"content-type": "image/jpeg"})
+
+    response = asyncio.run(
+        readings_router.create_photo_reading(
+            request=_DummyRequest(),
+            meter_register_id=uuid4(),
+            meter_point_id=None,
+            measured_at="2025-01-01T10:00:00",
+            value="",
+            photo=photo,
+            add_photo_reading_use_case=_SuccessfulPhotoUseCase(),
+            analytics_use_case=_FakeAnalyticsUseCase(),
+            list_buildings=_FakeListUseCase(),
+            list_units=_FakeListUseCase(),
+            list_meter_points=_FakeListUseCase(),
+            session=object(),
+        )
+    )
+
+    assert response.template.name == "capture_confirm.html"
+    assert response.context["plausibility_warning"] == readings_router.translate("de", "plausibility_unavailable")
+

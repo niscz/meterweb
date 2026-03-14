@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -15,6 +16,7 @@ from meterweb.application.dto import (
 )
 from meterweb.application.ports import OCRProvider, UnitOfWork
 from meterweb.application.services.plausibility import (
+    PLAUSIBILITY_UNAVAILABLE_WARNING,
     ReadingPlausibilityResult,
     evaluate_reading_plausibility,
 )
@@ -24,6 +26,8 @@ from meterweb.domain.metering import (
     consumption_from_absolute_readings,
     consumption_from_pulses,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AddReadingUseCase:
@@ -142,8 +146,17 @@ class AddPhotoReadingUseCase:
                 data.meter_register_id,
                 ocr_confidence=ocr_confidence,
             )
-        except Exception:
-            plausibility = ReadingPlausibilityResult(plausible=True, warning=None)
+        except (RuntimeError, ValueError, ArithmeticError):
+            logger.warning(
+                "plausibility_check_unavailable meter_register_id=%s reading_id=%s",
+                data.meter_register_id,
+                created.id,
+                exc_info=True,
+            )
+            plausibility = ReadingPlausibilityResult(
+                plausible=False,
+                warning=PLAUSIBILITY_UNAVAILABLE_WARNING,
+            )
         return (
             ReadingViewDTO(
                 id=created.id,

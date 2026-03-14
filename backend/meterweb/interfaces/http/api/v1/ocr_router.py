@@ -2,8 +2,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from meterweb.application.dto import OCRDecisionDTO, PhotoReadingCreateDTO
+from meterweb.application.services.plausibility import PLAUSIBILITY_UNAVAILABLE_WARNING
 from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, OCRAcceptUseCase, OCRRejectUseCase, OCRRunUseCase
-from meterweb.interfaces.http.common import enforce_csrf, require_auth
+from meterweb.interfaces.http.common import enforce_csrf, get_locale, require_auth, translate
 from meterweb.interfaces.http.dependencies import (
     get_add_photo_reading_use_case,
     get_app_settings,
@@ -24,6 +25,12 @@ from meterweb.interfaces.http.schemas import (
 )
 
 router = APIRouter(tags=["v1-ocr"])
+
+
+def _resolve_plausibility_warning(request: Request, warning: str | None) -> str | None:
+    if warning == PLAUSIBILITY_UNAVAILABLE_WARNING:
+        return translate(get_locale(request), "plausibility_unavailable")
+    return warning
 
 
 @router.post("/ocr/run", response_model=OCRRunResponse, dependencies=[Depends(enforce_csrf)])
@@ -97,7 +104,7 @@ def create_photo_reading(
                 else None
             ),
         ),
-        plausibility_warning=plausibility.warning,
+        plausibility_warning=_resolve_plausibility_warning(request, plausibility.warning),
     )
 
 

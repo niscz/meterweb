@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from meterweb.application.dto import PhotoReadingCreateDTO, ReadingCreateDTO
 from meterweb.application.use_cases.analytics import AnalyticsUseCase
 from meterweb.application.use_cases.buildings import ListBuildingsUseCase, ListMeterPointsUseCase, ListUnitsUseCase
+from meterweb.application.services.plausibility import PLAUSIBILITY_UNAVAILABLE_WARNING
 from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, AddReadingUseCase
 from meterweb.bootstrap import get_container
 from meterweb.infrastructure.db import get_session
@@ -67,6 +68,14 @@ async def _save_upload_streaming(photo: UploadFile) -> Path:
         await photo.close()
 
     return file_path
+
+
+
+
+def _translate_plausibility_warning(request: Request, warning: str | None) -> str | None:
+    if warning == PLAUSIBILITY_UNAVAILABLE_WARNING:
+        return translate(get_locale(request), "plausibility_unavailable")
+    return warning
 
 
 def _dashboard_response(
@@ -232,7 +241,7 @@ async def create_photo_reading(
             "lang": get_locale(request),
             "reading": reading,
             "ocr_result": ocr_result,
-            "plausibility_warning": plausibility.warning,
+            "plausibility_warning": _translate_plausibility_warning(request, plausibility.warning),
             "analytics": analytics,
             "image_path": str(file_path),
         },

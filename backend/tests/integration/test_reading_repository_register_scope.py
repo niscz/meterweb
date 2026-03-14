@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from meterweb.infrastructure.repositories import SqlAlchemyReadingRepository
-from meterweb.infrastructure.sqlalchemy_models import Base, BuildingRecord, MeterDeviceRecord, MeterPointRecord, MeterRegisterRecord, UnitRecord
+from meterweb.infrastructure.sqlalchemy_models import Base, BuildingRecord, MeterDeviceRecord, MeterPointRecord, MeterRegisterRecord, ReadingRecord, UnitRecord
 
 
 def _session() -> Session:
@@ -72,3 +72,36 @@ def test_meter_replacement_changes_current_register_lookup() -> None:
     repo.add_manual(UUID(new_register), datetime(2025, 3, 1, tzinfo=timezone.utc), Decimal("1"))
     session.commit()
     assert all(reading.meter_register_id == UUID(new_register) for reading in repo.list_for_meter_register(UUID(new_register)))
+
+
+def test_get_ocr_metadata_returns_empty_candidates_for_invalid_payload(caplog) -> None:
+    session = _session()
+    _meter_point_id, register_ht, _register_nt, _building_id = _seed_meter_with_two_registers(session)
+    reading_id = str(uuid4())
+    session.add(
+        ReadingRecord(
+            id=reading_id,
+            meter_register_id=str(register_ht),
+            measured_at=datetime(2025, 1, 2, tzinfo=timezone.utc),
+            value=Decimal("123"),
+            source="photo",
+            image_path="/uploads/meter.jpg",
+            ocr_confidence=Decimal("0.8700"),
+            ocr_text="123",
+            ocr_candidates='{"broken": ',
+            ocr_status="suggested",
+        )
+    )
+    session.commit()
+
+    repo = SqlAlchemyReadingRepository(session)
+
+    with caplog.at_level("WARNING"):
+        metadata = repo.get_ocr_metadata(UUID(reading_id))
+
+    assert metadata.ocr_candidates == []
+    assert metadata.ocr_status == "suggested"
+    assert any(
+        record.message == "invalid_ocr_candidates_payload" and getattr(record, "reading_id", None) == reading_id
+        for record in caplog.records
+    )

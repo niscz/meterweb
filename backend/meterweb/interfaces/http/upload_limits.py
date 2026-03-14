@@ -26,9 +26,14 @@ class MultipartUploadLimitMiddleware:
 
         headers = Headers(raw=scope.get("headers", []))
         content_length = headers.get("content-length")
-        if content_length is not None and int(content_length) > self.max_body_size_bytes:
-            await self._send_too_large(scope, send)
-            return
+        if content_length is not None:
+            try:
+                if int(content_length) > self.max_body_size_bytes:
+                    await self._send_too_large(scope, send)
+                    return
+            except (TypeError, ValueError):
+                await self._send_invalid_content_length(scope, send)
+                return
 
         total_received = 0
 
@@ -65,6 +70,14 @@ class MultipartUploadLimitMiddleware:
 
     async def _send_too_large(self, scope: Scope, send: Send) -> None:
         response = JSONResponse(status_code=413, content={"detail": "Datei ist zu groß."})
+
+        async def _noop_receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        await response(scope, _noop_receive, send)
+
+    async def _send_invalid_content_length(self, scope: Scope, send: Send) -> None:
+        response = JSONResponse(status_code=400, content={"detail": "Ungültiger Content-Length Header."})
 
         async def _noop_receive() -> Message:
             return {"type": "http.request", "body": b"", "more_body": False}

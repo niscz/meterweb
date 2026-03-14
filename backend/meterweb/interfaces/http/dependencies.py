@@ -24,10 +24,15 @@ from meterweb.application.use_cases.readings import (
 from meterweb.application.use_cases.weather import WeatherSyncUseCase
 from meterweb.bootstrap import AppContainer, get_container
 from meterweb.infrastructure.db import get_session
+from meterweb.infrastructure.settings import AppSettings
 
 
 def container() -> AppContainer:
     return get_container()
+
+
+def get_app_settings(app_container: AppContainer = Depends(container)) -> AppSettings:
+    return app_container.settings
 
 
 def get_login_use_case(app_container: AppContainer = Depends(container)) -> LoginUseCase:

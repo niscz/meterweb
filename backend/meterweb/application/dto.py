@@ -55,6 +55,21 @@ class OCRRunResultDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class ReadingOCRMetadataDTO:
+    image_path: str | None
+    ocr_confidence: float | None
+    ocr_text: str | None
+    ocr_candidates: list[OCRCandidateDTO]
+    ocr_status: str
+
+
+@dataclass(frozen=True, slots=True)
+class OCRDecisionDTO:
+    reading_id: UUID
+    value: Decimal | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class BuildingViewDTO:
     id: UUID
     name: str

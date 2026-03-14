@@ -16,6 +16,7 @@ from meterweb.infrastructure.sqlalchemy_models import (
     RawIntervalReadingRecord,
     RawPulseReadingRecord,
     RegisterTariffBindingRecord,
+    ReadingRecord,
     RolloverEventRecord,
     UnitRecord,
     BuildingRecord,
@@ -170,3 +171,66 @@ def test_persists_multi_register_raw_and_aggregate_paths() -> None:
     assert raw_pulse == 1
     assert raw_interval == 1
     assert aggregates == 1
+
+
+def test_persists_photo_ocr_fields_and_status_transitions() -> None:
+    session = _session()
+    building_id = str(uuid4())
+    unit_id = str(uuid4())
+    meter_point_id = str(uuid4())
+    device_id = str(uuid4())
+    register_id = str(uuid4())
+    reading_id = str(uuid4())
+
+    session.add(BuildingRecord(id=building_id, name="Haus OCR"))
+    session.add(UnitRecord(id=unit_id, building_id=building_id, name="E3"))
+    session.add(MeterPointRecord(id=meter_point_id, unit_id=unit_id, name="Wasser"))
+    session.add(
+        MeterDeviceRecord(
+            id=device_id,
+            meter_point_id=meter_point_id,
+            serial_number="OCR-1",
+            installed_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            removed_at=None,
+        )
+    )
+    session.add(
+        MeterRegisterRecord(
+            id=register_id,
+            meter_device_id=device_id,
+            code="MAIN",
+            measurement_unit="m3",
+            tariff_code=None,
+            rollover_limit=None,
+        )
+    )
+    session.add(
+        ReadingRecord(
+            id=reading_id,
+            meter_register_id=register_id,
+            measured_at=datetime(2025, 2, 1, tzinfo=timezone.utc),
+            value=Decimal("456"),
+            source="photo",
+            image_path="/uploads/meter.jpg",
+            ocr_confidence=Decimal("0.9100"),
+            ocr_text="Stand 456",
+            ocr_candidates='[{"value": "456", "confidence": 0.91}]',
+            ocr_status="suggested",
+        )
+    )
+    session.commit()
+
+    stored = session.scalar(select(ReadingRecord).where(ReadingRecord.id == reading_id))
+    assert stored is not None
+    assert stored.image_path == "/uploads/meter.jpg"
+    assert str(stored.ocr_confidence) == "0.9100"
+    assert stored.ocr_status == "suggested"
+
+    stored.ocr_status = "corrected"
+    stored.value = Decimal("457")
+    session.commit()
+
+    updated = session.scalar(select(ReadingRecord).where(ReadingRecord.id == reading_id))
+    assert updated is not None
+    assert updated.ocr_status == "corrected"
+    assert updated.value == Decimal("457")

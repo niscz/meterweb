@@ -1,15 +1,22 @@
+from uuid import UUID
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 
-from meterweb.application.dto import PhotoReadingCreateDTO
-from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, OCRRunUseCase
+from meterweb.application.dto import OCRDecisionDTO, PhotoReadingCreateDTO
+from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, OCRAcceptUseCase, OCRRejectUseCase, OCRRunUseCase
 from meterweb.interfaces.http.common import require_auth
-from meterweb.interfaces.http.dependencies import get_add_photo_reading_use_case, get_ocr_run_use_case
+from meterweb.interfaces.http.dependencies import (
+    get_add_photo_reading_use_case,
+    get_ocr_accept_use_case,
+    get_ocr_reject_use_case,
+    get_ocr_run_use_case,
+)
 from meterweb.interfaces.http.mappers import to_reading_response
 from meterweb.interfaces.http.schemas import (
     OCRCandidateResponse,
     OCRRunRequest,
+    OCRMetadataResponse,
     OCRRunResponse,
     PhotoReadingCreateRequest,
     PhotoReadingResponse,
@@ -60,4 +67,38 @@ def create_photo_reading(
             ),
         ),
         plausibility_warning=plausibility.warning,
+    )
+
+
+@router.post("/ocr/{reading_id}/accept", response_model=OCRMetadataResponse)
+def accept_ocr(
+    request: Request,
+    reading_id: str,
+    use_case: OCRAcceptUseCase = Depends(get_ocr_accept_use_case),
+):
+    require_auth(request)
+    metadata = use_case.execute(OCRDecisionDTO(reading_id=UUID(reading_id)))
+    return OCRMetadataResponse(
+        image_path=metadata.image_path,
+        ocr_confidence=metadata.ocr_confidence,
+        ocr_text=metadata.ocr_text,
+        candidates=[OCRCandidateResponse(value=item.value, confidence=item.confidence) for item in metadata.ocr_candidates],
+        status=metadata.ocr_status,
+    )
+
+
+@router.post("/ocr/{reading_id}/reject", response_model=OCRMetadataResponse)
+def reject_ocr(
+    request: Request,
+    reading_id: str,
+    use_case: OCRRejectUseCase = Depends(get_ocr_reject_use_case),
+):
+    require_auth(request)
+    metadata = use_case.execute(OCRDecisionDTO(reading_id=UUID(reading_id)))
+    return OCRMetadataResponse(
+        image_path=metadata.image_path,
+        ocr_confidence=metadata.ocr_confidence,
+        ocr_text=metadata.ocr_text,
+        candidates=[OCRCandidateResponse(value=item.value, confidence=item.confidence) for item in metadata.ocr_candidates],
+        status=metadata.ocr_status,
     )

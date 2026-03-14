@@ -13,7 +13,15 @@ from meterweb.application.use_cases.buildings import (
     ListUnitsUseCase,
 )
 from meterweb.application.use_cases.exports import ExportUseCase
-from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, AddReadingUseCase, OCRRunUseCase
+from meterweb.application.use_cases.readings import (
+    AddPhotoReadingUseCase,
+    AddReadingUseCase,
+    ConfirmReadingUseCase,
+    CorrectReadingUseCase,
+    OCRAcceptUseCase,
+    OCRRejectUseCase,
+    OCRRunUseCase,
+)
 from meterweb.application.use_cases.weather import WeatherSyncUseCase
 from meterweb.infrastructure.auth import EnvAuthenticator
 from meterweb.infrastructure.providers import ProviderFactory
@@ -108,6 +116,18 @@ class AppContainer:
 
     def export_use_case(self, session: Session) -> ExportUseCase:
         return ExportUseCase(self.reading_repository(session), self.report_renderer())
+
+    def confirm_reading_use_case(self, session: Session) -> ConfirmReadingUseCase:
+        return ConfirmReadingUseCase(self.unit_of_work(session))
+
+    def correct_reading_use_case(self, session: Session) -> CorrectReadingUseCase:
+        return CorrectReadingUseCase(self.unit_of_work(session))
+
+    def ocr_accept_use_case(self, session: Session) -> OCRAcceptUseCase:
+        return OCRAcceptUseCase(self.unit_of_work(session))
+
+    def ocr_reject_use_case(self, session: Session) -> OCRRejectUseCase:
+        return OCRRejectUseCase(self.unit_of_work(session))
 
     def weather_sync_use_case(self) -> WeatherSyncUseCase:
         return WeatherSyncUseCase(self.weather_provider(), self.weather_station_repository())

@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from meterweb.application.dto import OCRCandidateDTO, ReadingOCRMetadataDTO
 from meterweb.application.ports import BuildingRepository, MeterPointRepository, ReadingRepository, UnitRepository, WeatherStationRepository
 from meterweb.application.ports.repositories import MeterDeviceRepository, MeterRegisterRepository
 from meterweb.domain.building import Building, BuildingName
@@ -64,11 +65,82 @@ class SqlAlchemyReadingRepository(ReadingRepository):
     def add_manual(self, meter_register_id: UUID, measured_at: datetime, value: Decimal) -> Reading:
         return self._add_reading(meter_register_id, measured_at, value, source="manual")
 
-    def add_photo(self, meter_register_id: UUID, measured_at: datetime, value: Decimal, image_path: str, ocr_confidence: float) -> Reading:
-        del image_path, ocr_confidence
-        return self._add_reading(meter_register_id, measured_at, value, source="photo")
+    def add_photo(
+        self,
+        meter_register_id: UUID,
+        measured_at: datetime,
+        value: Decimal,
+        image_path: str,
+        ocr_confidence: float,
+        ocr_text: str,
+        ocr_candidates: list[OCRCandidateDTO],
+        ocr_status: str = "suggested",
+    ) -> Reading:
+        return self._add_reading(
+            meter_register_id,
+            measured_at,
+            value,
+            source="photo",
+            image_path=image_path,
+            ocr_confidence=ocr_confidence,
+            ocr_text=ocr_text,
+            ocr_candidates=ocr_candidates,
+            ocr_status=ocr_status,
+        )
 
-    def _add_reading(self, meter_register_id: UUID, measured_at: datetime, value: Decimal, source: str) -> Reading:
+    def update_ocr_status(
+        self,
+        reading_id: UUID,
+        *,
+        status: str,
+        corrected_value: Decimal | None = None,
+    ) -> Reading:
+        row = self._session.scalar(select(ReadingRecord).where(ReadingRecord.id == str(reading_id)).limit(1))
+        if row is None:
+            raise ValueError("Ablesung nicht gefunden.")
+
+        row.ocr_status = status
+        if corrected_value is not None:
+            row.value = corrected_value
+
+        return Reading(
+            id=UUID(row.id),
+            meter_register_id=UUID(row.meter_register_id),
+            measured_at=row.measured_at,
+            value=row.value,
+        )
+
+    def get_ocr_metadata(self, reading_id: UUID) -> ReadingOCRMetadataDTO:
+        row = self._session.scalar(select(ReadingRecord).where(ReadingRecord.id == str(reading_id)).limit(1))
+        if row is None:
+            raise ValueError("Ablesung nicht gefunden.")
+
+        parsed_candidates: list[OCRCandidateDTO] = []
+        if row.ocr_candidates:
+            for item in json.loads(row.ocr_candidates):
+                parsed_candidates.append(OCRCandidateDTO(value=Decimal(str(item["value"])), confidence=float(item["confidence"])))
+
+        return ReadingOCRMetadataDTO(
+            image_path=row.image_path,
+            ocr_confidence=float(row.ocr_confidence) if row.ocr_confidence is not None else None,
+            ocr_text=row.ocr_text,
+            ocr_candidates=parsed_candidates,
+            ocr_status=row.ocr_status,
+        )
+
+    def _add_reading(
+        self,
+        meter_register_id: UUID,
+        measured_at: datetime,
+        value: Decimal,
+        source: str,
+        *,
+        image_path: str | None = None,
+        ocr_confidence: float | None = None,
+        ocr_text: str | None = None,
+        ocr_candidates: list[OCRCandidateDTO] | None = None,
+        ocr_status: str = "manual",
+    ) -> Reading:
         register_exists = self._session.scalar(
             select(MeterRegisterRecord.id).where(MeterRegisterRecord.id == str(meter_register_id)).limit(1)
         )
@@ -83,6 +155,15 @@ class SqlAlchemyReadingRepository(ReadingRepository):
                 measured_at=reading.measured_at,
                 value=reading.value,
                 source=source,
+                image_path=image_path,
+                ocr_confidence=ocr_confidence,
+                ocr_text=ocr_text,
+                ocr_candidates=(
+                    json.dumps([{"value": str(item.value), "confidence": item.confidence} for item in ocr_candidates])
+                    if ocr_candidates is not None
+                    else None
+                ),
+                ocr_status=ocr_status,
             )
         )
         return reading

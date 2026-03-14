@@ -6,9 +6,11 @@ from uuid import UUID
 
 from meterweb.application.dto import (
     OCRCandidateDTO,
+    OCRDecisionDTO,
     OCRRunResultDTO,
     PhotoReadingCreateDTO,
     ReadingCreateDTO,
+    ReadingOCRMetadataDTO,
     ReadingViewDTO,
 )
 from meterweb.application.ports import OCRProvider, UnitOfWork
@@ -125,6 +127,9 @@ class AddPhotoReadingUseCase:
                 value,
                 data.image_path,
                 ocr_confidence,
+                ocr_result.text,
+                ocr_result.candidates,
+                ocr_status="suggested",
             )
             self._uow.commit()
         except Exception:
@@ -147,6 +152,72 @@ class AddPhotoReadingUseCase:
             ocr_result,
             plausibility,
         )
+
+
+class ConfirmReadingUseCase:
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+
+    def execute(self, data: OCRDecisionDTO) -> ReadingViewDTO:
+        self._uow.begin()
+        try:
+            reading = self._uow.reading_repository.update_ocr_status(data.reading_id, status="confirmed")
+            self._uow.commit()
+        except Exception:
+            self._uow.rollback()
+            raise
+        plausibility = evaluate_reading_plausibility(self._uow.reading_repository, reading.meter_register_id, ocr_confidence=None)
+        return ReadingViewDTO(id=reading.id, meter_register_id=reading.meter_register_id, measured_at=reading.measured_at, value=reading.value, plausible=plausibility.plausible)
+
+
+class CorrectReadingUseCase:
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+
+    def execute(self, data: OCRDecisionDTO) -> ReadingViewDTO:
+        if data.value is None:
+            raise ValueError("Korrigierter Wert erforderlich.")
+        self._uow.begin()
+        try:
+            reading = self._uow.reading_repository.update_ocr_status(data.reading_id, status="corrected", corrected_value=data.value)
+            self._uow.commit()
+        except Exception:
+            self._uow.rollback()
+            raise
+        plausibility = evaluate_reading_plausibility(self._uow.reading_repository, reading.meter_register_id, ocr_confidence=None)
+        return ReadingViewDTO(id=reading.id, meter_register_id=reading.meter_register_id, measured_at=reading.measured_at, value=reading.value, plausible=plausibility.plausible)
+
+
+class OCRAcceptUseCase:
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+
+    def execute(self, data: OCRDecisionDTO) -> ReadingOCRMetadataDTO:
+        self._uow.begin()
+        try:
+            self._uow.reading_repository.update_ocr_status(data.reading_id, status="accepted")
+            metadata = self._uow.reading_repository.get_ocr_metadata(data.reading_id)
+            self._uow.commit()
+        except Exception:
+            self._uow.rollback()
+            raise
+        return metadata
+
+
+class OCRRejectUseCase:
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+
+    def execute(self, data: OCRDecisionDTO) -> ReadingOCRMetadataDTO:
+        self._uow.begin()
+        try:
+            self._uow.reading_repository.update_ocr_status(data.reading_id, status="rejected")
+            metadata = self._uow.reading_repository.get_ocr_metadata(data.reading_id)
+            self._uow.commit()
+        except Exception:
+            self._uow.rollback()
+            raise
+        return metadata
 
 
 class ProcessAbsoluteReadingUseCase:

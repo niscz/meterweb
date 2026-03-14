@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -98,6 +98,11 @@ class ReadingRecord(Base):
     measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     value: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
     source: Mapped[str] = mapped_column(String(32), nullable=False)
+    image_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    ocr_confidence: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), nullable=True)
+    ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ocr_candidates: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ocr_status: Mapped[str] = mapped_column(String(32), nullable=False, default="manual")
 
 
 class RolloverEventRecord(Base):

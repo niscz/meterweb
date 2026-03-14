@@ -29,14 +29,14 @@ class MeterPointCreateDTO:
 
 @dataclass(frozen=True, slots=True)
 class ReadingCreateDTO:
-    meter_point_id: UUID
+    meter_register_id: UUID
     measured_at: datetime
     value: Decimal
 
 
 @dataclass(frozen=True, slots=True)
 class PhotoReadingCreateDTO:
-    meter_point_id: UUID
+    meter_register_id: UUID
     measured_at: datetime
     image_path: str
 
@@ -77,7 +77,7 @@ class MeterPointViewDTO:
 @dataclass(frozen=True, slots=True)
 class ReadingViewDTO:
     id: UUID
-    meter_point_id: UUID
+    meter_register_id: UUID
     measured_at: datetime
     value: Decimal
     plausible: bool
@@ -85,6 +85,7 @@ class ReadingViewDTO:
 
 @dataclass(frozen=True, slots=True)
 class AnalyticsViewDTO:
-    meter_point_id: UUID
+    scope_id: UUID
+    scope: str
     consumption: Decimal
     cost: Decimal

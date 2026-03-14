@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from meterweb.application.use_cases.exports import ExportUseCase
@@ -16,7 +16,13 @@ def monthly_rows(
     use_case: ExportUseCase = Depends(get_export_use_case),
 ):
     require_auth(request)
-    return {"rows": use_case.monthly_rows(payload.meter_point_id)}
+    if payload.meter_register_id:
+        return {"rows": use_case.monthly_rows_for_meter_register(payload.meter_register_id)}
+    if payload.meter_point_id:
+        return {"rows": use_case.monthly_rows_for_meter_point(payload.meter_point_id)}
+    if payload.building_id:
+        return {"rows": use_case.monthly_rows_for_building(payload.building_id)}
+    raise HTTPException(status_code=422, detail="scope required")
 
 
 @router.post("/reports/export/csv")
@@ -26,7 +32,13 @@ def export_csv(
     use_case: ExportUseCase = Depends(get_export_use_case),
 ):
     require_auth(request)
-    return Response(content=use_case.export_csv(payload.meter_point_id), media_type="text/csv")
+    if payload.meter_register_id:
+        return Response(content=use_case.export_csv_for_meter_register(payload.meter_register_id), media_type="text/csv")
+    if payload.meter_point_id:
+        return Response(content=use_case.export_csv(payload.meter_point_id), media_type="text/csv")
+    if payload.building_id:
+        return Response(content=use_case.export_csv_for_building(payload.building_id), media_type="text/csv")
+    raise HTTPException(status_code=422, detail="scope required")
 
 
 @router.post("/reports/export/xlsx")
@@ -36,7 +48,13 @@ def export_xlsx(
     use_case: ExportUseCase = Depends(get_export_use_case),
 ):
     require_auth(request)
-    return Response(content=use_case.export_xlsx(payload.meter_point_id), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    if payload.meter_register_id:
+        return Response(content=use_case.export_xlsx_for_meter_register(payload.meter_register_id), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    if payload.meter_point_id:
+        return Response(content=use_case.export_xlsx(payload.meter_point_id), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    if payload.building_id:
+        return Response(content=use_case.export_xlsx_for_building(payload.building_id), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    raise HTTPException(status_code=422, detail="scope required")
 
 
 @router.post("/reports/export/pdf")
@@ -46,4 +64,10 @@ def export_pdf(
     use_case: ExportUseCase = Depends(get_export_use_case),
 ):
     require_auth(request)
-    return Response(content=use_case.export_pdf(payload.meter_point_id), media_type="application/pdf")
+    if payload.meter_register_id:
+        return Response(content=use_case.export_pdf_for_meter_register(payload.meter_register_id), media_type="application/pdf")
+    if payload.meter_point_id:
+        return Response(content=use_case.export_pdf(payload.meter_point_id), media_type="application/pdf")
+    if payload.building_id:
+        return Response(content=use_case.export_pdf_for_building(payload.building_id), media_type="application/pdf")
+    raise HTTPException(status_code=422, detail="scope required")

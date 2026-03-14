@@ -10,10 +10,13 @@ class FakeReadingRepository:
     def __init__(self, readings: list[Reading]):
         self._readings = readings
 
-    def add_manual(self, meter_point_id, measured_at, value):
-        raise NotImplementedError
+    def list_for_meter_register(self, meter_register_id):
+        return [r for r in self._readings if r.meter_register_id == meter_register_id]
 
-    def list_for_meter_point(self, meter_point_id):
+    def list_for_meter_point(self, _meter_point_id):
+        return self._readings
+
+    def list_for_building(self, _building_id):
         return self._readings
 
 
@@ -26,10 +29,11 @@ def test_analytics_calculates_consumption_and_cost() -> None:
     ]
     use_case = AnalyticsUseCase(FakeReadingRepository(readings))
 
-    result = use_case.execute(uuid4(), Decimal("0.5"))
+    result = use_case.execute_for_meter_register(register_id, Decimal("0.5"))
 
     assert result.consumption == Decimal("30")
     assert result.cost == Decimal("15.0")
+    assert result.scope == "meter_register"
 
 
 def test_analytics_skips_negative_deltas() -> None:
@@ -41,7 +45,7 @@ def test_analytics_skips_negative_deltas() -> None:
     ]
     use_case = AnalyticsUseCase(FakeReadingRepository(readings))
 
-    result = use_case.execute(uuid4(), Decimal("0.5"))
+    result = use_case.execute_for_meter_register(register_id, Decimal("0.5"))
 
     assert result.consumption == Decimal("30")
     assert result.cost == Decimal("15.0")

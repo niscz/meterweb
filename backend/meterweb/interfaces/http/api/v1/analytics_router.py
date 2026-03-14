@@ -26,8 +26,21 @@ router = APIRouter(tags=["v1-analytics"])
 @router.get("/analytics/{meter_point_id}", response_model=AnalyticsResponse)
 def analytics(request: Request, meter_point_id: UUID, price_per_unit: Decimal = Decimal("0.35"), use_case: AnalyticsUseCase = Depends(get_analytics_use_case)):
     require_auth(request)
-    return to_analytics_response(use_case.execute(meter_point_id, price_per_unit))
+    return to_analytics_response(use_case.execute_for_meter_point(meter_point_id, price_per_unit))
 
+
+@router.get("/analytics/register/{meter_register_id}", response_model=AnalyticsResponse)
+def analytics_for_register(request: Request, meter_register_id: UUID, price_per_unit: Decimal = Decimal("0.35"), use_case: AnalyticsUseCase = Depends(get_analytics_use_case)):
+    require_auth(request)
+    return to_analytics_response(use_case.execute_for_meter_register(meter_register_id, price_per_unit))
+
+
+
+
+@router.get("/analytics/building/{building_id}", response_model=AnalyticsResponse)
+def analytics_for_building(request: Request, building_id: UUID, price_per_unit: Decimal = Decimal("0.35"), use_case: AnalyticsUseCase = Depends(get_analytics_use_case)):
+    require_auth(request)
+    return to_analytics_response(use_case.execute_for_building(building_id, price_per_unit))
 
 @router.post("/analytics/compute/absolute", response_model=ConsumptionResponse)
 def compute_absolute(request: Request, payload: AnalyticsComputeAbsoluteRequest):

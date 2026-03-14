@@ -61,33 +61,39 @@ class SqlAlchemyReadingRepository(ReadingRepository):
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def add_manual(self, meter_point_id: UUID, measured_at: datetime, value: Decimal) -> Reading:
-        return self._add_reading(meter_point_id, measured_at, value, source="manual")
+    def add_manual(self, meter_register_id: UUID, measured_at: datetime, value: Decimal) -> Reading:
+        return self._add_reading(meter_register_id, measured_at, value, source="manual")
 
-    def add_photo(self, meter_point_id: UUID, measured_at: datetime, value: Decimal, image_path: str, ocr_confidence: float) -> Reading:
+    def add_photo(self, meter_register_id: UUID, measured_at: datetime, value: Decimal, image_path: str, ocr_confidence: float) -> Reading:
         del image_path, ocr_confidence
-        return self._add_reading(meter_point_id, measured_at, value, source="photo")
+        return self._add_reading(meter_register_id, measured_at, value, source="photo")
 
-    def _add_reading(self, meter_point_id: UUID, measured_at: datetime, value: Decimal, source: str) -> Reading:
-        register_id = self._session.scalar(
-            select(MeterRegisterRecord.id)
-            .join(MeterDeviceRecord, MeterRegisterRecord.meter_device_id == MeterDeviceRecord.id)
-            .where(MeterDeviceRecord.meter_point_id == str(meter_point_id), MeterDeviceRecord.removed_at.is_(None))
-            .limit(1)
+    def _add_reading(self, meter_register_id: UUID, measured_at: datetime, value: Decimal, source: str) -> Reading:
+        register_exists = self._session.scalar(
+            select(MeterRegisterRecord.id).where(MeterRegisterRecord.id == str(meter_register_id)).limit(1)
         )
-        if register_id is None:
-            raise ValueError("Messpunkt hat kein aktives Register.")
-        reading = Reading(id=uuid4(), meter_register_id=UUID(register_id), measured_at=measured_at, value=value)
+        if register_exists is None:
+            raise ValueError("Zählwerk existiert nicht.")
+
+        reading = Reading(id=uuid4(), meter_register_id=meter_register_id, measured_at=measured_at, value=value)
         self._session.add(
             ReadingRecord(
                 id=str(reading.id),
-                meter_register_id=register_id,
+                meter_register_id=str(meter_register_id),
                 measured_at=reading.measured_at,
                 value=reading.value,
                 source=source,
             )
         )
         return reading
+
+    def list_for_meter_register(self, meter_register_id: UUID) -> list[Reading]:
+        rows = self._session.scalars(
+            select(ReadingRecord)
+            .where(ReadingRecord.meter_register_id == str(meter_register_id))
+            .order_by(ReadingRecord.measured_at)
+        ).all()
+        return [Reading(id=UUID(r.id), meter_register_id=UUID(r.meter_register_id), measured_at=r.measured_at, value=r.value) for r in rows]
 
     def list_for_meter_point(self, meter_point_id: UUID) -> list[Reading]:
         rows = self._session.scalars(
@@ -98,6 +104,28 @@ class SqlAlchemyReadingRepository(ReadingRepository):
             .order_by(ReadingRecord.measured_at)
         ).all()
         return [Reading(id=UUID(r.id), meter_register_id=UUID(r.meter_register_id), measured_at=r.measured_at, value=r.value) for r in rows]
+
+    def list_for_building(self, building_id: UUID) -> list[Reading]:
+        rows = self._session.scalars(
+            select(ReadingRecord)
+            .join(MeterRegisterRecord, ReadingRecord.meter_register_id == MeterRegisterRecord.id)
+            .join(MeterDeviceRecord, MeterRegisterRecord.meter_device_id == MeterDeviceRecord.id)
+            .join(MeterPointRecord, MeterDeviceRecord.meter_point_id == MeterPointRecord.id)
+            .join(UnitRecord, MeterPointRecord.unit_id == UnitRecord.id)
+            .where(UnitRecord.building_id == str(building_id))
+            .order_by(ReadingRecord.measured_at)
+        ).all()
+        return [Reading(id=UUID(r.id), meter_register_id=UUID(r.meter_register_id), measured_at=r.measured_at, value=r.value) for r in rows]
+
+    def get_current_register_for_meter_point(self, meter_point_id: UUID) -> UUID | None:
+        register_id = self._session.scalar(
+            select(MeterRegisterRecord.id)
+            .join(MeterDeviceRecord, MeterRegisterRecord.meter_device_id == MeterDeviceRecord.id)
+            .where(MeterDeviceRecord.meter_point_id == str(meter_point_id), MeterDeviceRecord.removed_at.is_(None))
+            .order_by(MeterDeviceRecord.installed_at.desc(), MeterRegisterRecord.code.asc())
+            .limit(1)
+        )
+        return UUID(register_id) if register_id else None
 
 
 class SqlAlchemyMeterDeviceRepository(MeterDeviceRepository):

@@ -42,7 +42,7 @@ def create_photo_reading(
     require_auth(request)
     reading, ocr_result, plausibility = use_case.execute(
         PhotoReadingCreateDTO(
-            meter_point_id=payload.meter_point_id,
+            meter_register_id=payload.meter_register_id,
             measured_at=payload.measured_at,
             image_path=payload.image_path,
         ),

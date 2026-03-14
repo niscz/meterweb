@@ -14,10 +14,10 @@ class ReadingPlausibilityResult:
 
 def evaluate_reading_plausibility(
     repository: ReadingRepository,
-    meter_point_id: UUID,
+    meter_register_id: UUID,
     ocr_confidence: float | None,
 ) -> ReadingPlausibilityResult:
-    readings = repository.list_for_meter_point(meter_point_id)
+    readings = repository.list_for_meter_register(meter_register_id)
     if len(readings) < 2:
         return ReadingPlausibilityResult(plausible=True, warning=None)
 

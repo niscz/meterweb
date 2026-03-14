@@ -51,15 +51,27 @@ class MeterRegisterRepository(ABC):
 
 class ReadingRepository(ABC):
     @abstractmethod
-    def add_manual(self, meter_point_id: UUID, measured_at: datetime, value: Decimal) -> Reading:
+    def add_manual(self, meter_register_id: UUID, measured_at: datetime, value: Decimal) -> Reading:
         raise NotImplementedError
 
     @abstractmethod
-    def add_photo(self, meter_point_id: UUID, measured_at: datetime, value: Decimal, image_path: str, ocr_confidence: float) -> Reading:
+    def add_photo(self, meter_register_id: UUID, measured_at: datetime, value: Decimal, image_path: str, ocr_confidence: float) -> Reading:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_for_meter_register(self, meter_register_id: UUID) -> list[Reading]:
         raise NotImplementedError
 
     @abstractmethod
     def list_for_meter_point(self, meter_point_id: UUID) -> list[Reading]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_for_building(self, building_id: UUID) -> list[Reading]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_current_register_for_meter_point(self, meter_point_id: UUID) -> UUID | None:
         raise NotImplementedError
 
 

@@ -1,11 +1,14 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
+from sqlalchemy.orm import Session
 
 from meterweb.application.dto import ReadingCreateDTO
 from meterweb.application.use_cases.exports import ExportUseCase
 from meterweb.application.use_cases.readings import AddReadingUseCase
+from meterweb.infrastructure.db import get_session
+from meterweb.infrastructure.repositories import SqlAlchemyReadingRepository
 from meterweb.interfaces.http.common import require_auth
 from meterweb.interfaces.http.dependencies import get_add_reading_use_case, get_export_use_case
 from meterweb.interfaces.http.mappers import to_reading_response
@@ -18,9 +21,18 @@ router = APIRouter(tags=["v1-readings"])
 def add_reading(request: Request, payload: ReadingCreateRequest, use_case: AddReadingUseCase = Depends(get_add_reading_use_case)):
     require_auth(request)
     created = use_case.execute(
-        ReadingCreateDTO(meter_point_id=payload.meter_point_id, measured_at=payload.measured_at, value=payload.value)
+        ReadingCreateDTO(meter_register_id=payload.meter_register_id, measured_at=payload.measured_at, value=payload.value)
     )
     return to_reading_response(created)
+
+
+@router.get("/meter-points/{meter_point_id}/current-register")
+def current_register_for_meter_point(request: Request, meter_point_id: UUID, session: Session = Depends(get_session)):
+    require_auth(request)
+    register_id = SqlAlchemyReadingRepository(session).get_current_register_for_meter_point(meter_point_id)
+    if register_id is None:
+        raise HTTPException(status_code=404, detail="Messpunkt hat kein aktives Register.")
+    return {"meter_register_id": str(register_id)}
 
 
 @router.post("/export/csv")

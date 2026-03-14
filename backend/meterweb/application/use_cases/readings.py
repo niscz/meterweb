@@ -34,7 +34,7 @@ class AddReadingUseCase:
             measured_at = measured_at.replace(tzinfo=timezone.utc)
         self._uow.begin()
         try:
-            created = self._uow.reading_repository.add_manual(data.meter_point_id, measured_at, data.value)
+            created = self._uow.reading_repository.add_manual(data.meter_register_id, measured_at, data.value)
             self._uow.commit()
         except Exception:
             self._uow.rollback()
@@ -42,12 +42,12 @@ class AddReadingUseCase:
 
         plausibility = evaluate_reading_plausibility(
             self._uow.reading_repository,
-            data.meter_point_id,
+            data.meter_register_id,
             ocr_confidence=None,
         )
         return ReadingViewDTO(
             id=created.id,
-            meter_point_id=data.meter_point_id,
+            meter_register_id=data.meter_register_id,
             measured_at=created.measured_at,
             value=created.value,
             plausible=plausibility.plausible,
@@ -120,7 +120,7 @@ class AddPhotoReadingUseCase:
         self._uow.begin()
         try:
             created = self._uow.reading_repository.add_photo(
-                data.meter_point_id,
+                data.meter_register_id,
                 measured_at,
                 value,
                 data.image_path,
@@ -133,13 +133,13 @@ class AddPhotoReadingUseCase:
 
         plausibility = evaluate_reading_plausibility(
             self._uow.reading_repository,
-            data.meter_point_id,
+            data.meter_register_id,
             ocr_confidence=ocr_confidence,
         )
         return (
             ReadingViewDTO(
                 id=created.id,
-                meter_point_id=data.meter_point_id,
+                meter_register_id=data.meter_register_id,
                 measured_at=created.measured_at,
                 value=created.value,
                 plausible=plausibility.plausible,

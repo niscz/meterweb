@@ -31,7 +31,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 @router.post("/dashboard/readings")
 def create_reading(
     request: Request,
-    meter_point_id: str = Form(),
+    meter_register_id: str = Form(),
     measured_at: str = Form(),
     value: str = Form(),
     add_reading_use_case: AddReadingUseCase = Depends(get_add_reading_use_case),
@@ -42,7 +42,7 @@ def create_reading(
 ):
     require_auth(request)
     try:
-        parsed_meter_point_id = UUID(meter_point_id)
+        parsed_meter_register_id = UUID(meter_register_id)
         parsed_measured_at = datetime.fromisoformat(measured_at)
         parsed_value = Decimal(value)
         if parsed_value <= Decimal("0"):
@@ -50,12 +50,12 @@ def create_reading(
 
         reading = add_reading_use_case.execute(
             ReadingCreateDTO(
-                meter_point_id=parsed_meter_point_id,
+                meter_register_id=parsed_meter_register_id,
                 measured_at=parsed_measured_at,
                 value=parsed_value,
             )
         )
-        analytics = analytics_use_case.execute(parsed_meter_point_id, Decimal("0.35"))
+        analytics = None
     except ValueError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
     return templates.TemplateResponse(
@@ -77,7 +77,7 @@ def create_reading(
 @router.post("/dashboard/readings/photo")
 async def create_photo_reading(
     request: Request,
-    meter_point_id: str = Form(),
+    meter_register_id: str = Form(),
     measured_at: str = Form(),
     value: str | None = Form(default=None),
     photo: UploadFile = File(),
@@ -85,7 +85,7 @@ async def create_photo_reading(
     analytics_use_case: AnalyticsUseCase = Depends(get_analytics_use_case),
 ):
     require_auth(request)
-    parsed_meter_point_id = UUID(meter_point_id)
+    parsed_meter_register_id = UUID(meter_register_id)
     parsed_measured_at = datetime.fromisoformat(measured_at)
     suffix = Path(photo.filename or "upload.jpg").suffix or ".jpg"
     file_path = UPLOAD_DIR / f"{uuid4()}{suffix}"
@@ -93,13 +93,13 @@ async def create_photo_reading(
     confirmed_value = Decimal(value) if value else None
     reading, ocr_result, plausibility = add_photo_reading_use_case.execute(
         PhotoReadingCreateDTO(
-            meter_point_id=parsed_meter_point_id,
+            meter_register_id=parsed_meter_register_id,
             measured_at=parsed_measured_at,
             image_path=str(file_path),
         ),
         confirmed_value=confirmed_value,
     )
-    analytics = analytics_use_case.execute(parsed_meter_point_id, Decimal("0.35"))
+    analytics = None
     return templates.TemplateResponse(
         request,
         "capture_confirm.html",

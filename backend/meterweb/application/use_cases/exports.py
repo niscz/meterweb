@@ -62,30 +62,39 @@ class ExportUseCase:
 
 
 def _monthly_rows(readings: list[Reading]) -> list[dict[str, str]]:
+    # Fachliche Regel für die Monatszuordnung:
+    # Verbrauch wird immer aus zwei aufeinanderfolgenden absoluten Readings desselben Registers
+    # berechnet (prev -> current) und vollständig dem Monat des `current.measured_at`
+    # zugeordnet. Dadurch ist die Logik für Register-, Meter-Point- und Building-Exports
+    # identisch und liefert konsistente Werte für CSV/XLSX/PDF.
     grouped: dict[str, list[Reading]] = {}
     for reading in readings:
         key = reading.measured_at.strftime("%Y-%m")
         grouped.setdefault(key, []).append(reading)
 
-    rows: list[dict[str, str]] = []
-    for month, month_readings in sorted(grouped.items()):
-        consumption = Decimal("0")
-        by_register: dict[UUID, list[Reading]] = defaultdict(list)
-        for reading in month_readings:
-            by_register[reading.meter_register_id].append(reading)
+    consumption_by_month: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+    by_register: dict[UUID, list[Reading]] = defaultdict(list)
+    for reading in readings:
+        by_register[reading.meter_register_id].append(reading)
 
-        for register_readings in by_register.values():
-            ordered = sorted(register_readings, key=lambda r: (r.measured_at, r.id))
-            for prev, current in zip(ordered, ordered[1:]):
-                try:
-                    consumption += consumption_from_absolute_readings(prev.value, current.value)
-                except ValueError:
-                    continue
+    for register_readings in by_register.values():
+        ordered = sorted(register_readings, key=lambda r: (r.measured_at, r.id))
+        for prev, current in zip(ordered, ordered[1:]):
+            try:
+                delta = consumption_from_absolute_readings(prev.value, current.value)
+            except ValueError:
+                continue
+            month_key = current.measured_at.strftime("%Y-%m")
+            consumption_by_month[month_key] += delta
+
+    rows: list[dict[str, str]] = []
+    for month in sorted(grouped.keys()):
+        month_readings = grouped[month]
         rows.append(
             {
                 "month": month,
                 "readings": str(len(month_readings)),
-                "consumption": str(consumption),
+                "consumption": str(consumption_by_month[month]),
             }
         )
     return rows

@@ -65,3 +65,48 @@ def test_export_pdf_passes_selected_language_to_renderer() -> None:
     assert payload == b"pdf"
     assert renderer.last_pdf_context is not None
     assert renderer.last_pdf_context["lang"] == "en"
+
+
+
+def test_monthly_rows_assigns_delta_to_month_of_current_reading() -> None:
+    register_id = uuid4()
+    readings = [
+        Reading(id=uuid4(), meter_register_id=register_id, measured_at=datetime(2025, 1, 31, tzinfo=timezone.utc), value=Decimal("100")),
+        Reading(id=uuid4(), meter_register_id=register_id, measured_at=datetime(2025, 2, 1, tzinfo=timezone.utc), value=Decimal("110")),
+    ]
+
+    use_case = ExportUseCase(FakeReadingRepository(readings), FakeReportRenderer())
+
+    rows = use_case.monthly_rows_for_meter_point(uuid4())
+
+    assert rows == [
+        {"month": "2025-01", "readings": "1", "consumption": "0"},
+        {"month": "2025-02", "readings": "1", "consumption": "10"},
+    ]
+
+
+def test_monthly_rows_are_consistent_across_register_meter_point_and_building() -> None:
+    register_a = uuid4()
+    register_b = uuid4()
+    readings = [
+        Reading(id=uuid4(), meter_register_id=register_a, measured_at=datetime(2025, 1, 31, tzinfo=timezone.utc), value=Decimal("100")),
+        Reading(id=uuid4(), meter_register_id=register_a, measured_at=datetime(2025, 2, 5, tzinfo=timezone.utc), value=Decimal("115")),
+        Reading(id=uuid4(), meter_register_id=register_b, measured_at=datetime(2025, 1, 20, tzinfo=timezone.utc), value=Decimal("40")),
+        Reading(id=uuid4(), meter_register_id=register_b, measured_at=datetime(2025, 2, 20, tzinfo=timezone.utc), value=Decimal("52")),
+    ]
+
+    use_case = ExportUseCase(FakeReadingRepository(readings), FakeReportRenderer())
+
+    rows_for_register_a = use_case.monthly_rows_for_meter_register(register_a)
+    rows_for_meter_point = use_case.monthly_rows_for_meter_point(uuid4())
+    rows_for_building = use_case.monthly_rows_for_building(uuid4())
+
+    assert rows_for_register_a == [
+        {"month": "2025-01", "readings": "1", "consumption": "0"},
+        {"month": "2025-02", "readings": "1", "consumption": "15"},
+    ]
+    assert rows_for_meter_point == rows_for_building
+    assert rows_for_meter_point == [
+        {"month": "2025-01", "readings": "2", "consumption": "0"},
+        {"month": "2025-02", "readings": "2", "consumption": "27"},
+    ]

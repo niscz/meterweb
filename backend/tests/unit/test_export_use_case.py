@@ -21,6 +21,9 @@ class FakeReadingRepository:
 
 
 class FakeReportRenderer:
+    def __init__(self):
+        self.last_pdf_context = None
+
     def render_csv(self, _rows):
         return b"csv"
 
@@ -28,6 +31,7 @@ class FakeReportRenderer:
         return b"xlsx"
 
     def render_pdf_template(self, _template, _context):
+        self.last_pdf_context = _context
         return b"pdf"
 
 
@@ -45,3 +49,19 @@ def test_monthly_rows_group_deltas_by_register_for_interleaved_readings() -> Non
     rows = use_case.monthly_rows_for_meter_point(uuid4())
 
     assert rows == [{"month": "2025-01", "readings": "4", "consumption": "18"}]
+
+
+def test_export_pdf_passes_selected_language_to_renderer() -> None:
+    register_id = uuid4()
+    readings = [
+        Reading(id=uuid4(), meter_register_id=register_id, measured_at=datetime(2025, 1, 1, tzinfo=timezone.utc), value=Decimal("100")),
+        Reading(id=uuid4(), meter_register_id=register_id, measured_at=datetime(2025, 1, 2, tzinfo=timezone.utc), value=Decimal("101")),
+    ]
+    renderer = FakeReportRenderer()
+    use_case = ExportUseCase(FakeReadingRepository(readings), renderer)
+
+    payload = use_case.export_pdf(uuid4(), lang="en")
+
+    assert payload == b"pdf"
+    assert renderer.last_pdf_context is not None
+    assert renderer.last_pdf_context["lang"] == "en"

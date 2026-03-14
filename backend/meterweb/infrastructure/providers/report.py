@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from meterweb.application.ports import ReportRenderer
+from meterweb.interfaces.http.common import translate
+from meterweb.interfaces.http.templating import format_date_value, format_month, format_number
 
 
 class WeasyPrintReportRenderer(ReportRenderer):
@@ -21,7 +23,15 @@ class WeasyPrintReportRenderer(ReportRenderer):
             loader=FileSystemLoader(str(self._template_dir)),
             autoescape=select_autoescape(["html", "xml"]),
         )
-        html = template_env.get_template(template_path).render(**context)
+        lang = context.get("lang", "de")
+        render_context = {
+            **context,
+            "t": lambda key: translate(lang, key),
+            "fmt_number": lambda value: format_number(value, lang),
+            "fmt_month": lambda value: format_month(value, lang),
+            "fmt_date": lambda value: format_date_value(value, lang),
+        }
+        html = template_env.get_template(template_path).render(**render_context)
         return HTML(string=html).write_pdf()
 
     def render_xlsx(self, rows: list[dict[str, str]]) -> bytes:

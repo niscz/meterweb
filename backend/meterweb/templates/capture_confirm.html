@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Capture Confirm | meterweb{% endblock %}
+{% block title %}{{ t('capture_confirm_title') }}{% endblock %}
 {% block content %}
-<h1 class="h2">OCR Bestätigung</h1>
+<h1 class="h2">{{ t('capture_confirm_heading') }}</h1>
 <div class="card card-body">
-  <p>Erkannter Text: <strong>{{ ocr_result.text }}</strong></p>
-  <p>Bester Kandidat: <strong>{{ ocr_result.best_candidate.value if ocr_result.best_candidate else '-' }}</strong>
-     (Confidence: {{ ocr_result.best_candidate.confidence if ocr_result.best_candidate else 0 }})</p>
+  <p>{{ t('recognized_text') }}: <strong>{{ ocr_result.text }}</strong></p>
+  <p>{{ t('best_candidate') }}: <strong>{{ ocr_result.best_candidate.value if ocr_result.best_candidate else '-' }}</strong>
+     ({{ t('confidence') }}: {{ fmt_number(ocr_result.best_candidate.confidence if ocr_result.best_candidate else 0) }})</p>
   {% if plausibility_warning %}<div class="alert alert-warning">{{ plausibility_warning }}</div>{% endif %}
-  <p>Gespeicherter Stand: {{ reading.value }}</p>
-  <p>Verbrauch: {{ analytics.consumption }} kWh</p>
-  <a href="/dashboard" class="btn btn-primary">Zurück</a>
+  <p>{{ t('stored_reading') }}: {{ fmt_number(reading.value) }}</p>
+  <p>{{ t('consumption') }}: {{ fmt_number(analytics.consumption) }} {{ t('kwh') }}</p>
+  <a href="/dashboard" class="btn btn-primary">{{ t('back') }}</a>
 </div>
 {% endblock %}

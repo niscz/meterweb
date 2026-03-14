@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from meterweb.application.dto import OCRDecisionDTO, PhotoReadingCreateDTO
 from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, OCRAcceptUseCase, OCRRejectUseCase, OCRRunUseCase
@@ -34,8 +34,19 @@ def run_ocr(
     settings: AppSettings = Depends(get_app_settings),
 ):
     require_auth(request)
-    image_path = normalize_upload_path(payload.image_path, settings)
-    result = use_case.execute(image_path)
+    try:
+        image_path = normalize_upload_path(payload.image_path, settings)
+        result = use_case.execute(image_path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Bilddatei nicht gefunden.") from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="OCR-Verarbeitung derzeit nicht verfügbar.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     return OCRRunResponse(
         text=result.text,
         candidates=[OCRCandidateResponse(value=item.value, confidence=item.confidence) for item in result.candidates],
@@ -55,15 +66,26 @@ def create_photo_reading(
     settings: AppSettings = Depends(get_app_settings),
 ):
     require_auth(request)
-    image_path = normalize_upload_path(payload.image_path, settings)
-    reading, ocr_result, plausibility = use_case.execute(
-        PhotoReadingCreateDTO(
-            meter_register_id=payload.meter_register_id,
-            measured_at=payload.measured_at,
-            image_path=str(image_path),
-        ),
-        confirmed_value=payload.confirmed_value,
-    )
+    try:
+        image_path = normalize_upload_path(payload.image_path, settings)
+        reading, ocr_result, plausibility = use_case.execute(
+            PhotoReadingCreateDTO(
+                meter_register_id=payload.meter_register_id,
+                measured_at=payload.measured_at,
+                image_path=str(image_path),
+            ),
+            confirmed_value=payload.confirmed_value,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Bilddatei nicht gefunden.") from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="OCR-Verarbeitung derzeit nicht verfügbar.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     return PhotoReadingResponse(
         reading=to_reading_response(reading),
         ocr_result=OCRRunResponse(

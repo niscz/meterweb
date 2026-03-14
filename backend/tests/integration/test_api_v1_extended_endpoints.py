@@ -6,6 +6,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from meterweb.application.dto import OCRCandidateDTO, OCRRunResultDTO, ReadingViewDTO
+from meterweb.bootstrap import get_container
 from meterweb.application.ports.weather_provider import WeatherSeriesPoint
 from meterweb.infrastructure.db import init_db
 from meterweb.interfaces.http.dependencies import (
@@ -34,6 +35,7 @@ def _setup_auth_env(monkeypatch, tmp_path: Path) -> None:
 def _client(tmp_path: Path) -> TestClient:
     from meterweb.main import create_app
 
+    get_container.cache_clear()
     app = create_app()
     init_db()
     app.dependency_overrides = {}
@@ -74,6 +76,24 @@ class _FakePhotoUseCase:
         return reading, ocr_result, type("Plausibility", (), {"warning": None})()
 
 
+
+
+
+
+class _FailingOCRRunUseCase:
+    def __init__(self, exc: Exception):
+        self._exc = exc
+
+    def execute(self, _image_path):
+        raise self._exc
+
+
+class _FailingPhotoUseCase:
+    def __init__(self, exc: Exception):
+        self._exc = exc
+
+    def execute(self, _data, confirmed_value=None):
+        raise self._exc
 
 
 class _FakeConfirmUseCase:
@@ -243,3 +263,60 @@ def test_extended_v1_endpoints_and_validation(monkeypatch, tmp_path: Path) -> No
 
     assert monthly.status_code == 200
     assert export_csv.status_code == 200
+
+
+def test_ocr_endpoints_map_expected_exceptions(monkeypatch, tmp_path: Path) -> None:
+    _setup_auth_env(monkeypatch, tmp_path)
+    client = _client(tmp_path)
+    _login(client)
+
+    image_path = str((tmp_path / "uploads" / "meter.jpg").resolve())
+
+    client.app.dependency_overrides[get_ocr_run_use_case] = lambda: _FailingOCRRunUseCase(FileNotFoundError("missing file"))
+    missing_file = client.post("/api/v1/ocr/run", json={"image_path": image_path})
+    assert missing_file.status_code == 422
+    assert missing_file.json() == {"detail": "Bilddatei nicht gefunden."}
+
+    client.app.dependency_overrides[get_ocr_run_use_case] = lambda: _FailingOCRRunUseCase(RuntimeError("tesseract missing"))
+    ocr_unavailable = client.post("/api/v1/ocr/run", json={"image_path": image_path})
+    assert ocr_unavailable.status_code == 422
+    assert ocr_unavailable.json() == {"detail": "OCR-Verarbeitung derzeit nicht verfügbar."}
+
+    client.app.dependency_overrides[get_ocr_run_use_case] = lambda: _FailingOCRRunUseCase(ValueError("Ungültiger OCR-Input"))
+    invalid_input = client.post("/api/v1/ocr/run", json={"image_path": image_path})
+    assert invalid_input.status_code == 400
+    assert invalid_input.json() == {"detail": "Ungültiger OCR-Input"}
+
+
+def test_create_photo_reading_maps_expected_exceptions(monkeypatch, tmp_path: Path) -> None:
+    _setup_auth_env(monkeypatch, tmp_path)
+    client = _client(tmp_path)
+    _login(client)
+
+    building = client.post("/api/v1/buildings", json={"name": "Haus API"}).json()
+    unit = client.post("/api/v1/units", json={"building_id": building["id"], "name": "WEG API"}).json()
+    meter_point = client.post("/api/v1/meter-points", json={"unit_id": unit["id"], "name": "Strom"}).json()
+    current_register = client.get(f"/api/v1/meter-points/{meter_point['id']}/current-register").json()
+    image_path = str((tmp_path / "uploads" / "meter.jpg").resolve())
+
+    base_payload = {
+        "meter_register_id": current_register["meter_register_id"],
+        "measured_at": "2025-01-01T00:00:00+00:00",
+        "image_path": image_path,
+        "confirmed_value": "1240",
+    }
+
+    client.app.dependency_overrides[get_add_photo_reading_use_case] = lambda: _FailingPhotoUseCase(FileNotFoundError("missing file"))
+    missing_file = client.post("/api/v1/ocr/readings", json=base_payload)
+    assert missing_file.status_code == 422
+    assert missing_file.json() == {"detail": "Bilddatei nicht gefunden."}
+
+    client.app.dependency_overrides[get_add_photo_reading_use_case] = lambda: _FailingPhotoUseCase(RuntimeError("tesseract missing"))
+    ocr_unavailable = client.post("/api/v1/ocr/readings", json=base_payload)
+    assert ocr_unavailable.status_code == 422
+    assert ocr_unavailable.json() == {"detail": "OCR-Verarbeitung derzeit nicht verfügbar."}
+
+    client.app.dependency_overrides[get_add_photo_reading_use_case] = lambda: _FailingPhotoUseCase(ValueError("Ungültiger OCR-Input"))
+    invalid_input = client.post("/api/v1/ocr/readings", json=base_payload)
+    assert invalid_input.status_code == 400
+    assert invalid_input.json() == {"detail": "Ungültiger OCR-Input"}

@@ -31,6 +31,26 @@ def test_create_unit_propagates_domain_validation_error(monkeypatch) -> None:
         )
 
 
+def test_create_unit_wrapper_returns_unit_response_shape(monkeypatch) -> None:
+    monkeypatch.setattr(api_router, "require_auth", lambda request: "admin")
+    unit_id = uuid4()
+    building_id = uuid4()
+
+    class DummyUseCase:
+        def execute(self, _data):
+            return UnitViewDTO(id=unit_id, building_id=building_id, name="WEG 1")
+
+    response = api_router.create_unit(
+        request=_request("/api/v1/units"),
+        payload=UnitCreateRequest(building_id=building_id, name="WEG 1"),
+        use_case=DummyUseCase(),
+    )
+
+    assert response.id == str(unit_id)
+    assert response.building_id == str(building_id)
+    assert response.name == "WEG 1"
+
+
 def test_dashboard_create_building_returns_validation_response(monkeypatch) -> None:
     monkeypatch.setattr(web_router, "require_auth", lambda request: "admin")
     monkeypatch.setattr(web_router, "get_locale", lambda request: "de")
@@ -53,6 +73,30 @@ def test_dashboard_create_building_returns_validation_response(monkeypatch) -> N
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_dashboard_create_building_wrapper_redirects_on_success(monkeypatch) -> None:
+    monkeypatch.setattr(web_router, "require_auth", lambda request: "admin")
+
+    class SuccessfulCreateBuildingUseCase:
+        def execute(self, _data):
+            return None
+
+    class EmptyListUseCase:
+        def execute(self):
+            return []
+
+    response = web_router.create_building(
+        request=_request("/dashboard/buildings"),
+        name="Haus A",
+        use_case=SuccessfulCreateBuildingUseCase(),
+        list_buildings=EmptyListUseCase(),
+        list_units=EmptyListUseCase(),
+        list_meter_points=EmptyListUseCase(),
+    )
+
+    assert response.status_code == status.HTTP_303_SEE_OTHER
+    assert response.headers["location"] == "/dashboard"
 
 
 @pytest.mark.anyio

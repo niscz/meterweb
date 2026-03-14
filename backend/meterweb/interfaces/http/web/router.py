@@ -1,4 +1,5 @@
 from fastapi import APIRouter, status
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from meterweb.application.dto import BuildingCreateDTO
@@ -39,4 +40,4 @@ def create_building(request, name: str, use_case: CreateBuildingUseCase, list_bu
             },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-    return None
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)

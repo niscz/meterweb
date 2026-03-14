@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
-from meterweb.interfaces.http.common import get_locale, translate
+from meterweb.interfaces.http.common import get_csrf_token, get_locale, translate
 
 
 def _to_decimal(value: object) -> Decimal:
@@ -86,6 +86,7 @@ def i18n_context(request: Request) -> dict[str, object]:
         "fmt_number": lambda value: format_number(value, lang),
         "fmt_month": lambda value: format_month(value, lang),
         "fmt_date": lambda value: format_date_value(value, lang),
+        "csrf_token": get_csrf_token(request),
     }
 
 

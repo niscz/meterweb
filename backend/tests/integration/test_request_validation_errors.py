@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -12,8 +13,23 @@ def _client(tmp_path: Path) -> TestClient:
     return TestClient(app)
 
 
+
+
+def _extract_csrf_token(html: str) -> str:
+    match = re.search(r'name="csrf_token"\s+value="([^"]+)"', html)
+    assert match is not None
+    return match.group(1)
+
+
+def _csrf_headers(client: TestClient) -> dict[str, str]:
+    page = client.get("/dashboard")
+    token = _extract_csrf_token(page.text)
+    return {"X-CSRF-Token": token}
+
 def _login(client: TestClient) -> None:
-    response = client.post("/login", data={"username": "admin_user", "password": "SehrSicheresPasswort123"}, follow_redirects=False)
+    login_page = client.get("/login")
+    csrf_token = _extract_csrf_token(login_page.text)
+    response = client.post("/login", data={"username": "admin_user", "password": "SehrSicheresPasswort123", "csrf_token": csrf_token}, follow_redirects=False)
     assert response.status_code == 303
 
 
@@ -30,7 +46,7 @@ def test_invalid_uuid_is_rejected_with_422(monkeypatch, tmp_path: Path) -> None:
     client = _client(tmp_path)
     _login(client)
 
-    response = client.post("/api/v1/units", json={"building_id": "not-a-uuid", "name": "WEG 1"})
+    response = client.post("/api/v1/units", headers=_csrf_headers(client), json={"building_id": "not-a-uuid", "name": "WEG 1"})
 
     assert response.status_code == 422
 
@@ -40,13 +56,13 @@ def test_negative_or_zero_reading_values_are_rejected_with_422(monkeypatch, tmp_
     client = _client(tmp_path)
     _login(client)
 
-    building = client.post("/api/v1/buildings", json={"name": "Haus C"}).json()
-    unit = client.post("/api/v1/units", json={"building_id": building["id"], "name": "WEG 3"}).json()
-    meter_point = client.post("/api/v1/meter-points", json={"unit_id": unit["id"], "name": "Strom"}).json()
+    building = client.post("/api/v1/buildings", headers=_csrf_headers(client), json={"name": "Haus C"}).json()
+    unit = client.post("/api/v1/units", headers=_csrf_headers(client), json={"building_id": building["id"], "name": "WEG 3"}).json()
+    meter_point = client.post("/api/v1/meter-points", headers=_csrf_headers(client), json={"unit_id": unit["id"], "name": "Strom"}).json()
     current_register = client.get(f"/api/v1/meter-points/{meter_point['id']}/current-register").json()
 
     response = client.post(
-        "/api/v1/readings",
+        "/api/v1/readings", headers=_csrf_headers(client),
         json={"meter_register_id": current_register["meter_register_id"], "measured_at": "2025-01-01T00:00:00+00:00", "value": "0"},
     )
 
@@ -59,7 +75,7 @@ def test_unknown_reference_returns_400(monkeypatch, tmp_path: Path) -> None:
     _login(client)
 
     response = client.post(
-        "/api/v1/readings",
+        "/api/v1/readings", headers=_csrf_headers(client),
         json={
             "meter_register_id": str(uuid4()),
             "measured_at": "2025-01-01T00:00:00+00:00",

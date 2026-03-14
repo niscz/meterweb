@@ -9,7 +9,7 @@ from meterweb.application.use_cases.readings import (
     ProcessIntervalReadingUseCase,
     ProcessPulseReadingUseCase,
 )
-from meterweb.interfaces.http.common import require_auth
+from meterweb.interfaces.http.common import enforce_csrf, require_auth
 from meterweb.interfaces.http.dependencies import get_analytics_use_case
 from meterweb.interfaces.http.mappers import to_analytics_response
 from meterweb.interfaces.http.schemas import (
@@ -42,7 +42,7 @@ def analytics_for_building(request: Request, building_id: UUID, price_per_unit: 
     require_auth(request)
     return to_analytics_response(use_case.execute_for_building(building_id, price_per_unit))
 
-@router.post("/analytics/compute/absolute", response_model=ConsumptionResponse)
+@router.post("/analytics/compute/absolute", response_model=ConsumptionResponse, dependencies=[Depends(enforce_csrf)])
 def compute_absolute(request: Request, payload: AnalyticsComputeAbsoluteRequest):
     require_auth(request)
     consumption = ProcessAbsoluteReadingUseCase().compute_consumption(
@@ -53,7 +53,7 @@ def compute_absolute(request: Request, payload: AnalyticsComputeAbsoluteRequest)
     return {"consumption": consumption}
 
 
-@router.post("/analytics/compute/pulse", response_model=ConsumptionResponse)
+@router.post("/analytics/compute/pulse", response_model=ConsumptionResponse, dependencies=[Depends(enforce_csrf)])
 def compute_pulse(request: Request, payload: AnalyticsComputePulseRequest):
     require_auth(request)
     consumption = ProcessPulseReadingUseCase().compute_consumption(
@@ -63,7 +63,7 @@ def compute_pulse(request: Request, payload: AnalyticsComputePulseRequest):
     return {"consumption": consumption}
 
 
-@router.post("/analytics/compute/interval", response_model=ConsumptionResponse)
+@router.post("/analytics/compute/interval", response_model=ConsumptionResponse, dependencies=[Depends(enforce_csrf)])
 def compute_interval(request: Request, payload: AnalyticsComputeIntervalRequest):
     require_auth(request)
     consumption = ProcessIntervalReadingUseCase().compute_consumption(

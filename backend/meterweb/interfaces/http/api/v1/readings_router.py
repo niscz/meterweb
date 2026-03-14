@@ -9,7 +9,7 @@ from meterweb.application.use_cases.exports import ExportUseCase
 from meterweb.application.use_cases.readings import AddReadingUseCase, ConfirmReadingUseCase, CorrectReadingUseCase
 from meterweb.infrastructure.db import get_session
 from meterweb.infrastructure.repositories import SqlAlchemyReadingRepository
-from meterweb.interfaces.http.common import require_auth
+from meterweb.interfaces.http.common import enforce_csrf, require_auth
 from meterweb.interfaces.http.dependencies import (
     get_add_reading_use_case,
     get_confirm_reading_use_case,
@@ -22,7 +22,7 @@ from meterweb.interfaces.http.schemas import ReadingCorrectRequest, ReadingCreat
 router = APIRouter(tags=["v1-readings"])
 
 
-@router.post("/readings", response_model=ReadingResponse)
+@router.post("/readings", response_model=ReadingResponse, dependencies=[Depends(enforce_csrf)])
 def add_reading(request: Request, payload: ReadingCreateRequest, use_case: AddReadingUseCase = Depends(get_add_reading_use_case)):
     require_auth(request)
     created = use_case.execute(
@@ -40,25 +40,25 @@ def current_register_for_meter_point(request: Request, meter_point_id: UUID, ses
     return {"meter_register_id": str(register_id)}
 
 
-@router.post("/export/csv")
+@router.post("/export/csv", dependencies=[Depends(enforce_csrf)])
 def export_csv(request: Request, meter_point_id: UUID, use_case: ExportUseCase = Depends(get_export_use_case)):
     require_auth(request)
     return Response(content=use_case.export_csv(meter_point_id), media_type="text/csv")
 
 
-@router.post("/export/xlsx")
+@router.post("/export/xlsx", dependencies=[Depends(enforce_csrf)])
 def export_xlsx(request: Request, meter_point_id: UUID, use_case: ExportUseCase = Depends(get_export_use_case)):
     require_auth(request)
     return Response(content=use_case.export_xlsx(meter_point_id), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
-@router.post("/export/pdf")
+@router.post("/export/pdf", dependencies=[Depends(enforce_csrf)])
 def export_pdf(request: Request, meter_point_id: UUID, use_case: ExportUseCase = Depends(get_export_use_case)):
     require_auth(request)
     return Response(content=use_case.export_pdf(meter_point_id), media_type="application/pdf")
 
 
-@router.post("/readings/{reading_id}/confirm", response_model=ReadingResponse)
+@router.post("/readings/{reading_id}/confirm", response_model=ReadingResponse, dependencies=[Depends(enforce_csrf)])
 def confirm_reading(
     request: Request,
     reading_id: UUID,
@@ -69,7 +69,7 @@ def confirm_reading(
     return to_reading_response(updated)
 
 
-@router.post("/readings/{reading_id}/correct", response_model=ReadingResponse)
+@router.post("/readings/{reading_id}/correct", response_model=ReadingResponse, dependencies=[Depends(enforce_csrf)])
 def correct_reading(
     request: Request,
     reading_id: UUID,

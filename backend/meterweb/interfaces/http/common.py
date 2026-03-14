@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import HTTPException, Request, status
 
 TRANSLATIONS = {
@@ -95,6 +97,10 @@ TRANSLATIONS = {
     },
 }
 
+CSRF_SESSION_KEY = "csrf_token"
+CSRF_FORM_FIELD = "csrf_token"
+CSRF_HEADER = "X-CSRF-Token"
+
 
 def require_auth(request: Request) -> str:
     username = request.session.get("username")
@@ -115,3 +121,32 @@ def translate(lang: str, key: str) -> str:
     locale = lang if lang in TRANSLATIONS else "de"
     fallback = TRANSLATIONS["de"]
     return TRANSLATIONS[locale].get(key, fallback.get(key, key))
+
+
+def get_csrf_token(request: Request) -> str:
+    token = request.session.get(CSRF_SESSION_KEY)
+    if not token:
+        token = secrets.token_urlsafe(32)
+        request.session[CSRF_SESSION_KEY] = token
+    return token
+
+
+async def enforce_csrf(request: Request) -> None:
+    if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        get_csrf_token(request)
+        return
+
+    if request.url.path.startswith("/api/v1") and not request.session.get("username"):
+        return
+
+    session_token = get_csrf_token(request)
+    submitted_token = request.headers.get(CSRF_HEADER)
+
+    if not submitted_token:
+        content_type = request.headers.get("content-type", "").lower()
+        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            form_data = await request.form()
+            submitted_token = form_data.get(CSRF_FORM_FIELD)
+
+    if not submitted_token or not secrets.compare_digest(session_token, str(submitted_token)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid CSRF token")

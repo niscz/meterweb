@@ -13,7 +13,7 @@ from meterweb.application.use_cases.readings import AddPhotoReadingUseCase, AddR
 from meterweb.bootstrap import get_container
 from meterweb.infrastructure.db import get_session
 from meterweb.infrastructure.repositories import SqlAlchemyReadingRepository
-from meterweb.interfaces.http.common import get_locale, require_auth, translate
+from meterweb.interfaces.http.common import enforce_csrf, get_locale, require_auth, translate
 from meterweb.interfaces.http.templating import create_templates
 from meterweb.interfaces.http.dependencies import (
     get_add_photo_reading_use_case,
@@ -73,7 +73,7 @@ def _resolve_register_id(session: Session, meter_register_id: UUID | str | None,
     return register_id
 
 
-@router.post("/dashboard/readings")
+@router.post("/dashboard/readings", dependencies=[Depends(enforce_csrf)])
 def create_reading(
     request: Request,
     meter_register_id: UUID | None = Form(default=None),
@@ -115,7 +115,7 @@ def create_reading(
     )
 
 
-@router.post("/dashboard/readings/photo")
+@router.post("/dashboard/readings/photo", dependencies=[Depends(enforce_csrf)])
 async def create_photo_reading(
     request: Request,
     meter_register_id: UUID | None = Form(default=None),

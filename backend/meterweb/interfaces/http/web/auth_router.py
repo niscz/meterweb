@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 from meterweb.application.dto import LoginDTO
 from meterweb.application.use_cases.auth import LoginUseCase
 from meterweb.domain.auth import AuthenticationError
-from meterweb.interfaces.http.common import TRANSLATIONS, get_locale
+from meterweb.interfaces.http.common import enforce_csrf, TRANSLATIONS, get_locale
 from meterweb.interfaces.http.dependencies import get_login_use_case
 from meterweb.interfaces.http.templating import create_templates
 
@@ -23,7 +23,7 @@ def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", {"error": None, "lang": lang})
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(enforce_csrf)])
 def login_submit(request: Request, username: str = Form(), password: str = Form(), use_case: LoginUseCase = Depends(get_login_use_case)):
     lang = get_locale(request)
     try:

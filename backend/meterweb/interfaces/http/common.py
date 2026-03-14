@@ -48,6 +48,7 @@ TRANSLATIONS = {
         "photo_reading_invalid_input": "Die Foto-Ablesung enthält ungültige Eingaben. Bitte prüfen Sie Datum und Zählerstand.",
         "photo_reading_ocr_failed": "Die OCR-Verarbeitung ist fehlgeschlagen. Bitte Foto erneut aufnehmen oder Wert manuell eingeben.",
         "photo_reading_failed": "Die Foto-Ablesung konnte nicht gespeichert werden. Bitte erneut versuchen.",
+        "plausibility_unavailable": "Die Plausibilitätsprüfung konnte nicht durchgeführt werden. Bitte prüfen Sie den Wert manuell.",
     },
     "en": {
         "login_error": "Invalid credentials.",
@@ -94,6 +95,7 @@ TRANSLATIONS = {
         "photo_reading_invalid_input": "The photo reading contains invalid input. Please verify date and meter value.",
         "photo_reading_ocr_failed": "OCR processing failed. Please retake the photo or enter the value manually.",
         "photo_reading_failed": "The photo reading could not be saved. Please try again.",
+        "plausibility_unavailable": "Plausibility check could not be performed. Please verify the value manually.",
     },
 }
 

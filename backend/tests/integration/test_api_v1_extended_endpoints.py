@@ -20,12 +20,15 @@ from meterweb.interfaces.http.dependencies import (
 
 
 def _setup_auth_env(monkeypatch, tmp_path: Path) -> None:
+    uploads_dir = tmp_path / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'meterweb.db'}")
     monkeypatch.setenv("SECRET_KEY", "Test-secret-key-with-32-characters1!")
     monkeypatch.setenv("ADMIN_USERNAME", "admin_user")
     monkeypatch.setenv("ADMIN_PASSWORD", "SehrSicheresPasswort123!")
     monkeypatch.setenv("ADMIN_PASSWORD_HASH_FILE", str(tmp_path / "admin.hash"))
     monkeypatch.setenv("SESSION_HTTPS_ONLY", "false")
+    monkeypatch.setenv("UPLOADS_DIR", str(uploads_dir))
 
 
 def _client(tmp_path: Path) -> TestClient:
@@ -150,7 +153,9 @@ def test_extended_v1_endpoints_and_validation(monkeypatch, tmp_path: Path) -> No
     meter_point = client.post("/api/v1/meter-points", json={"unit_id": unit["id"], "name": "Strom"}).json()
     current_register = client.get(f"/api/v1/meter-points/{meter_point['id']}/current-register").json()
 
-    ocr_run = client.post("/api/v1/ocr/run", json={"image_path": "tests/fixtures/meter.jpg"})
+    upload_image_path = str((tmp_path / "uploads" / "meter.jpg").resolve())
+
+    ocr_run = client.post("/api/v1/ocr/run", json={"image_path": upload_image_path})
     assert ocr_run.status_code == 200
     assert ocr_run.json()["best_candidate"]["value"] == "1234"
 
@@ -159,12 +164,29 @@ def test_extended_v1_endpoints_and_validation(monkeypatch, tmp_path: Path) -> No
         json={
             "meter_register_id": current_register["meter_register_id"],
             "measured_at": "2025-01-01T00:00:00+00:00",
-            "image_path": "tests/fixtures/meter.jpg",
+            "image_path": upload_image_path,
             "confirmed_value": "1240",
         },
     )
     assert ocr_reading.status_code == 200
     assert ocr_reading.json()["reading"]["value"] == "1240"
+
+
+    blocked_ocr_run = client.post("/api/v1/ocr/run", json={"image_path": "../etc/passwd"})
+    assert blocked_ocr_run.status_code == 400
+    assert "innerhalb des Upload-Verzeichnisses" in blocked_ocr_run.json()["detail"]
+
+    blocked_ocr_reading = client.post(
+        "/api/v1/ocr/readings",
+        json={
+            "meter_register_id": current_register["meter_register_id"],
+            "measured_at": "2025-01-02T00:00:00+00:00",
+            "image_path": "/tmp/escape.jpg",
+            "confirmed_value": "1240",
+        },
+    )
+    assert blocked_ocr_reading.status_code == 400
+    assert "innerhalb des Upload-Verzeichnisses" in blocked_ocr_reading.json()["detail"]
 
 
     confirm_resp = client.post(f"/api/v1/readings/{fake_photo_use_case.last_reading_id}/confirm")

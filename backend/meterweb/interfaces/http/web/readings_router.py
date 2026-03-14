@@ -1,5 +1,5 @@
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -29,6 +29,32 @@ router = APIRouter(tags=["web-readings"])
 
 UPLOAD_DIR = get_container().settings.uploads_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+def _dashboard_response(
+    request: Request,
+    *,
+    analytics_use_case: AnalyticsUseCase,
+    list_buildings: ListBuildingsUseCase,
+    list_units: ListUnitsUseCase,
+    list_meter_points: ListMeterPointsUseCase,
+    meter_point_id: UUID | None,
+    reading_error: str | None,
+):
+    analytics = analytics_use_case.execute(meter_point_id, Decimal("0.35")) if meter_point_id else None
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        {
+            "lang": get_locale(request),
+            "buildings": list_buildings.execute(),
+            "units": list_units.execute(),
+            "meter_points": list_meter_points.execute(),
+            "analytics": analytics,
+            "reading_error": reading_error,
+            "building_error": None,
+            "ocr_result": None,
+        },
+    )
 
 
 def _as_uuid(value: UUID | str) -> UUID:
@@ -77,22 +103,16 @@ def create_reading(
                 value=parsed_value,
             )
         )
-        analytics = analytics_use_case.execute(meter_point_id, Decimal("0.35")) if meter_point_id else None
     except ValueError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
-    return templates.TemplateResponse(
+    return _dashboard_response(
         request,
-        "dashboard.html",
-        {
-            "lang": get_locale(request),
-            "buildings": list_buildings.execute(),
-            "units": list_units.execute(),
-            "meter_points": list_meter_points.execute(),
-            "analytics": analytics,
-            "reading_error": None if reading.plausible else translate(get_locale(request), "reading_not_plausible"),
-            "building_error": None,
-            "ocr_result": None,
-        },
+        analytics_use_case=analytics_use_case,
+        list_buildings=list_buildings,
+        list_units=list_units,
+        list_meter_points=list_meter_points,
+        meter_point_id=meter_point_id,
+        reading_error=None if reading.plausible else translate(get_locale(request), "reading_not_plausible"),
     )
 
 
@@ -106,23 +126,69 @@ async def create_photo_reading(
     photo: UploadFile = File(),
     add_photo_reading_use_case: AddPhotoReadingUseCase = Depends(get_add_photo_reading_use_case),
     analytics_use_case: AnalyticsUseCase = Depends(get_analytics_use_case),
+    list_buildings: ListBuildingsUseCase = Depends(get_list_buildings_use_case),
+    list_units: ListUnitsUseCase = Depends(get_list_units_use_case),
+    list_meter_points: ListMeterPointsUseCase = Depends(get_list_meter_points_use_case),
     session: Session = Depends(get_session),
 ):
     require_auth(request)
-    parsed_meter_register_id = _resolve_register_id(session, meter_register_id, meter_point_id)
-    parsed_measured_at = datetime.fromisoformat(measured_at)
-    suffix = Path(photo.filename or "upload.jpg").suffix or ".jpg"
-    file_path = UPLOAD_DIR / f"{uuid4()}{suffix}"
-    file_path.write_bytes(await photo.read())
-    confirmed_value = Decimal(value) if value else None
-    reading, ocr_result, plausibility = add_photo_reading_use_case.execute(
-        PhotoReadingCreateDTO(
-            meter_register_id=parsed_meter_register_id,
-            measured_at=parsed_measured_at,
-            image_path=str(file_path),
-        ),
-        confirmed_value=confirmed_value,
-    )
+    file_path: Path | None = None
+    upload_written = False
+    try:
+        parsed_meter_register_id = _resolve_register_id(session, meter_register_id, meter_point_id)
+        parsed_measured_at = datetime.fromisoformat(measured_at)
+        confirmed_value = Decimal(value) if value else None
+
+        suffix = Path(photo.filename or "upload.jpg").suffix or ".jpg"
+        file_path = UPLOAD_DIR / f"{uuid4()}{suffix}"
+        file_path.write_bytes(await photo.read())
+        upload_written = True
+
+        reading, ocr_result, plausibility = add_photo_reading_use_case.execute(
+            PhotoReadingCreateDTO(
+                meter_register_id=parsed_meter_register_id,
+                measured_at=parsed_measured_at,
+                image_path=str(file_path),
+            ),
+            confirmed_value=confirmed_value,
+        )
+    except (ValueError, InvalidOperation):
+        if upload_written and file_path and file_path.exists():
+            file_path.unlink(missing_ok=True)
+        return _dashboard_response(
+            request,
+            analytics_use_case=analytics_use_case,
+            list_buildings=list_buildings,
+            list_units=list_units,
+            list_meter_points=list_meter_points,
+            meter_point_id=meter_point_id,
+            reading_error=translate(get_locale(request), "photo_reading_invalid_input"),
+        )
+    except (RuntimeError, FileNotFoundError):
+        if upload_written and file_path and file_path.exists():
+            file_path.unlink(missing_ok=True)
+        return _dashboard_response(
+            request,
+            analytics_use_case=analytics_use_case,
+            list_buildings=list_buildings,
+            list_units=list_units,
+            list_meter_points=list_meter_points,
+            meter_point_id=meter_point_id,
+            reading_error=translate(get_locale(request), "photo_reading_ocr_failed"),
+        )
+    except Exception:
+        if upload_written and file_path and file_path.exists():
+            file_path.unlink(missing_ok=True)
+        return _dashboard_response(
+            request,
+            analytics_use_case=analytics_use_case,
+            list_buildings=list_buildings,
+            list_units=list_units,
+            list_meter_points=list_meter_points,
+            meter_point_id=meter_point_id,
+            reading_error=translate(get_locale(request), "photo_reading_failed"),
+        )
+
     analytics = analytics_use_case.execute(meter_point_id, Decimal("0.35")) if meter_point_id else None
     return templates.TemplateResponse(
         request,

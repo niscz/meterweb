@@ -7,14 +7,27 @@ from meterweb.application.use_cases.weather import WeatherSyncUseCase
 from meterweb.interfaces.http.common import require_auth
 from meterweb.interfaces.http.dependencies import get_weather_sync_use_case
 from meterweb.interfaces.http.mappers import to_weather_series_item
+from meterweb.interfaces.http.schemas import (
+    WeatherSeriesRequest,
+    WeatherStationManualRequest,
+    WeatherStationResponse,
+    WeatherStationSelectRequest,
+    WeatherSyncRequest,
+    WeatherSyncResponse,
+)
 
 router = APIRouter(tags=["v1-weather"])
 
 
-@router.get("/weather/buildings/{building_id}/station")
-def get_station(request: Request, building_id: UUID, lat: float, lon: float, use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case)):
+@router.post("/weather/buildings/{building_id}/station", response_model=WeatherStationResponse)
+def get_station(
+    request: Request,
+    building_id: UUID,
+    payload: WeatherStationSelectRequest,
+    use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case),
+):
     require_auth(request)
-    return {"station_id": use_case.select_station(building_id, lat, lon)}
+    return {"station_id": use_case.select_station(building_id, payload.lat, payload.lon)}
 
 
 @router.post("/weather/buildings/{building_id}/station/auto")
@@ -25,9 +38,14 @@ def set_station_auto(request: Request, building_id: UUID, use_case: WeatherSyncU
 
 
 @router.post("/weather/buildings/{building_id}/station/manual")
-def set_station_manual(request: Request, building_id: UUID, station_id: str, use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case)):
+def set_station_manual(
+    request: Request,
+    building_id: UUID,
+    payload: WeatherStationManualRequest,
+    use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case),
+):
     require_auth(request)
-    use_case.set_manual_station(building_id, station_id)
+    use_case.set_manual_station(building_id, payload.station_id)
     return {"status": "ok"}
 
 
@@ -45,3 +63,37 @@ def weather_series(
     require_auth(request)
     points = use_case.get_series(building_id, lat, lon, start_date, end_date, resolution)
     return [to_weather_series_item(point) for point in points]
+
+
+@router.post("/weather/buildings/{building_id}/series")
+def weather_series_post(
+    request: Request,
+    building_id: UUID,
+    payload: WeatherSeriesRequest,
+    use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case),
+):
+    require_auth(request)
+    points = use_case.get_series(
+        building_id,
+        payload.lat,
+        payload.lon,
+        payload.start_date.date(),
+        payload.end_date.date(),
+        payload.resolution,
+    )
+    return [to_weather_series_item(point) for point in points]
+
+
+@router.post("/weather/buildings/{building_id}/sync", response_model=WeatherSyncResponse)
+def sync_weather(
+    request: Request,
+    building_id: UUID,
+    payload: WeatherSyncRequest,
+    use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case),
+):
+    require_auth(request)
+    today = date.today()
+    start = today.replace(day=1)
+    for resolution in payload.resolutions:
+        use_case.get_series(building_id, payload.lat, payload.lon, start, today, resolution)
+    return {"status": "ok", "synced_resolutions": payload.resolutions}

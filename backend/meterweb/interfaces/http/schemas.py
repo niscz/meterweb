@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -53,8 +53,8 @@ class WeatherStationManualRequest(BaseModel):
 class WeatherSeriesRequest(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
-    start_date: datetime
-    end_date: datetime
+    start_date: date
+    end_date: date
     resolution: str = Field(default="daily", min_length=1)
 
 

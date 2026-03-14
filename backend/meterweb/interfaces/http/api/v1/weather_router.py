@@ -18,9 +18,20 @@ from meterweb.interfaces.http.schemas import (
 
 router = APIRouter(tags=["v1-weather"])
 
+@router.get("/weather/buildings/{building_id}/station", response_model=WeatherStationResponse)
+def get_station(
+    request: Request,
+    building_id: UUID,
+    lat: float,
+    lon: float,
+    use_case: WeatherSyncUseCase = Depends(get_weather_sync_use_case),
+):
+    require_auth(request)
+    return {"station_id": use_case.select_station(building_id, lat, lon)}
+
 
 @router.post("/weather/buildings/{building_id}/station", response_model=WeatherStationResponse)
-def get_station(
+def get_station_post(
     request: Request,
     building_id: UUID,
     payload: WeatherStationSelectRequest,
@@ -77,8 +88,8 @@ def weather_series_post(
         building_id,
         payload.lat,
         payload.lon,
-        payload.start_date.date(),
-        payload.end_date.date(),
+        payload.start_date,
+        payload.end_date,
         payload.resolution,
     )
     return [to_weather_series_item(point) for point in points]

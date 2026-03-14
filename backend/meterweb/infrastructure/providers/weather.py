@@ -1,31 +1,51 @@
 import json
 from datetime import date
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
+from meterweb.application.errors import UpstreamServiceError
 from meterweb.application.ports import WeatherProvider, WeatherSeriesPoint, WeatherSnapshot
 
 
 class BrightSkyWeatherProvider(WeatherProvider):
-    def __init__(self, cache_dir: Path, timeout_seconds: float = 5.0) -> None:
+    def __init__(self, cache_dir: Path, timeout_seconds: float = 5.0, base_url: str = "https://api.brightsky.dev") -> None:
         self._cache_dir = cache_dir
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._timeout_seconds = timeout_seconds
+        self._base_url = base_url.rstrip("/")
 
     def find_station(self, latitude: float, longitude: float) -> str:
         key = f"station_{latitude:.4f}_{longitude:.4f}.json"
         cache_file = self._cache_dir / key
-        if cache_file.exists():
-            return json.loads(cache_file.read_text(encoding="utf-8"))["station_id"]
-        station_id = f"AUTO-{latitude:.2f}-{longitude:.2f}"
-        cache_file.write_text(json.dumps({"station_id": station_id}), encoding="utf-8")
-        return station_id
+        cached_station = self._read_cache(cache_file)
+        if cached_station and cached_station.get("station_id"):
+            return str(cached_station["station_id"])
+
+        params = urlencode({"lat": latitude, "lon": longitude})
+        url = f"{self._base_url}/sources?{params}"
+        try:
+            with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
+                data = json.load(response)
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise UpstreamServiceError("Bright Sky Stationssuche fehlgeschlagen.") from exc
+
+        sources = data.get("sources", []) if isinstance(data, dict) else []
+        if not sources:
+            raise ValueError("Keine passende Wetterstation von Bright Sky gefunden.")
+        station_id = next((source.get("id") for source in sources if source.get("id")), None)
+        if not station_id:
+            raise ValueError("Ungültige Bright Sky Stationsantwort.")
+
+        station_id_str = str(station_id)
+        self._write_cache(cache_file, {"station_id": station_id_str})
+        return station_id_str
 
     def get_daily_snapshot(self, latitude: float, longitude: float, day: date, station_id: str | None = None) -> WeatherSnapshot:
         cache_file = self._cache_file(latitude, longitude, day, station_id)
-        if cache_file.exists():
-            payload = json.loads(cache_file.read_text(encoding="utf-8"))
+        payload = self._read_cache(cache_file)
+        if payload:
             return WeatherSnapshot(
                 date=date.fromisoformat(payload["date"]),
                 temperature_c=payload["temperature_c"],
@@ -41,9 +61,12 @@ class BrightSkyWeatherProvider(WeatherProvider):
                 "dwd_station_id": station_id,
             }
         )
-        url = f"https://api.brightsky.dev/weather?{params}"
-        with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
-            data = json.load(response)
+        url = f"{self._base_url}/weather?{params}"
+        try:
+            with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
+                data = json.load(response)
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise UpstreamServiceError("Bright Sky Wetterabruf fehlgeschlagen.") from exc
 
         weather_entries = data.get("weather", [])
         if not weather_entries:
@@ -64,7 +87,7 @@ class BrightSkyWeatherProvider(WeatherProvider):
             "temperature_c": snapshot.temperature_c,
             "cloud_cover_percent": snapshot.cloud_cover_percent,
         }
-        cache_file.write_text(json.dumps(cache_payload), encoding="utf-8")
+        self._write_cache(cache_file, cache_payload)
         return snapshot
 
     def get_series(
@@ -77,8 +100,8 @@ class BrightSkyWeatherProvider(WeatherProvider):
         station_id: str | None = None,
     ) -> list[WeatherSeriesPoint]:
         cache_file = self._cache_dir / f"series_{latitude:.4f}_{longitude:.4f}_{start_date.isoformat()}_{end_date.isoformat()}_{resolution}_{station_id or 'auto'}.json"
-        if cache_file.exists():
-            cached = json.loads(cache_file.read_text(encoding="utf-8"))
+        cached = self._read_cache(cache_file)
+        if cached:
             return [WeatherSeriesPoint(**item) for item in cached]
 
         params = urlencode(
@@ -90,9 +113,12 @@ class BrightSkyWeatherProvider(WeatherProvider):
                 "dwd_station_id": station_id,
             }
         )
-        url = f"https://api.brightsky.dev/weather?{params}"
-        with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
-            data = json.load(response)
+        url = f"{self._base_url}/weather?{params}"
+        try:
+            with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
+                data = json.load(response)
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise UpstreamServiceError("Bright Sky Wetterserienabruf fehlgeschlagen.") from exc
 
         weather_entries = data.get("weather", [])
         if not weather_entries:
@@ -133,10 +159,24 @@ class BrightSkyWeatherProvider(WeatherProvider):
                     )
                 )
 
-        cache_file.write_text(json.dumps([p.__dict__ for p in points]), encoding="utf-8")
+        self._write_cache(cache_file, [p.__dict__ for p in points])
         return points
 
     def _cache_file(self, latitude: float, longitude: float, day: date, station_id: str | None) -> Path:
         station_key = station_id or "auto"
         key = f"{latitude:.4f}_{longitude:.4f}_{day.isoformat()}_{station_key}.json"
         return self._cache_dir / key
+
+    def _read_cache(self, cache_file: Path) -> dict | list | None:
+        if not cache_file.exists():
+            return None
+        try:
+            return json.loads(cache_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    def _write_cache(self, cache_file: Path, payload: dict | list) -> None:
+        try:
+            cache_file.write_text(json.dumps(payload), encoding="utf-8")
+        except OSError:
+            return

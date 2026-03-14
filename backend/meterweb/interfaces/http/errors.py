@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from meterweb.application.errors import UpstreamServiceError
 from meterweb.domain.auth import AuthenticationError
 from meterweb.domain.metering import MeteringDomainError
 
@@ -18,6 +19,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(MeteringDomainError)
     async def metering_domain_error_handler(_: Request, exc: MeteringDomainError) -> JSONResponse:
         return _json_error(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
+
+    @app.exception_handler(UpstreamServiceError)
+    async def upstream_service_error_handler(_: Request, exc: UpstreamServiceError) -> JSONResponse:
+        return _json_error(status.HTTP_502_BAD_GATEWAY, str(exc) or "Upstream service unavailable.")
 
     @app.exception_handler(ValueError)
     async def value_error_handler(_: Request, exc: ValueError) -> JSONResponse:

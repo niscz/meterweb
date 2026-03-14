@@ -9,6 +9,9 @@ from meterweb.application.errors import UpstreamServiceError
 from meterweb.application.ports import WeatherProvider, WeatherSeriesPoint, WeatherSnapshot
 
 
+_ALLOWED_RESOLUTIONS = {"hourly", "daily"}
+
+
 class BrightSkyWeatherProvider(WeatherProvider):
     def __init__(self, cache_dir: Path, timeout_seconds: float = 5.0, base_url: str = "https://api.brightsky.dev") -> None:
         self._cache_dir = cache_dir
@@ -99,6 +102,7 @@ class BrightSkyWeatherProvider(WeatherProvider):
         resolution: str,
         station_id: str | None = None,
     ) -> list[WeatherSeriesPoint]:
+        self._validate_series_input(latitude, longitude, start_date, end_date, resolution)
         cache_file = self._cache_dir / f"series_{latitude:.4f}_{longitude:.4f}_{start_date.isoformat()}_{end_date.isoformat()}_{resolution}_{station_id or 'auto'}.json"
         cached = self._read_cache(cache_file)
         if cached:
@@ -123,9 +127,6 @@ class BrightSkyWeatherProvider(WeatherProvider):
         weather_entries = data.get("weather", [])
         if not weather_entries:
             return []
-
-        if resolution not in {"hourly", "daily"}:
-            raise ValueError("resolution muss hourly oder daily sein")
 
         points: list[WeatherSeriesPoint] = []
         if resolution == "hourly":
@@ -161,6 +162,24 @@ class BrightSkyWeatherProvider(WeatherProvider):
 
         self._write_cache(cache_file, [p.__dict__ for p in points])
         return points
+
+
+    def _validate_series_input(
+        self,
+        latitude: float,
+        longitude: float,
+        start_date: date,
+        end_date: date,
+        resolution: str,
+    ) -> None:
+        if not -90 <= latitude <= 90:
+            raise ValueError("lat muss zwischen -90 und 90 liegen")
+        if not -180 <= longitude <= 180:
+            raise ValueError("lon muss zwischen -180 und 180 liegen")
+        if start_date > end_date:
+            raise ValueError("start_date muss <= end_date sein")
+        if resolution not in _ALLOWED_RESOLUTIONS:
+            raise ValueError("resolution muss hourly oder daily sein")
 
     def _cache_file(self, latitude: float, longitude: float, day: date, station_id: str | None) -> Path:
         station_key = station_id or "auto"

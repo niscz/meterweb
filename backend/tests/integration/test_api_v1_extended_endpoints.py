@@ -207,6 +207,37 @@ def test_extended_v1_endpoints_and_validation(monkeypatch, tmp_path: Path) -> No
     assert ocr_reject.status_code == 200
     assert ocr_reject.json()["status"] == "rejected"
 
+    invalid_series_resolution = client.get(
+        f"/api/v1/weather/buildings/{building['id']}/series",
+        params={
+            "lat": 48.1,
+            "lon": 11.5,
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-02",
+            "resolution": "weekly",
+        },
+    )
+    assert invalid_series_resolution.status_code == 422
+
+    invalid_series_range = client.get(
+        f"/api/v1/weather/buildings/{building['id']}/series",
+        params={
+            "lat": 48.1,
+            "lon": 11.5,
+            "start_date": "2025-01-03",
+            "end_date": "2025-01-02",
+            "resolution": "daily",
+        },
+    )
+    assert invalid_series_range.status_code == 422
+    assert isinstance(invalid_series_range.json().get("detail"), list)
+
+    invalid_sync_resolution = client.post(
+        f"/api/v1/weather/buildings/{building['id']}/sync",
+        json={"lat": 48.1, "lon": 11.5, "resolutions": ["weekly"]},
+    )
+    assert invalid_sync_resolution.status_code == 422
+
     monthly = client.post("/api/v1/reports/monthly", json={"meter_register_id": current_register["meter_register_id"]})
     export_csv = client.post("/api/v1/reports/export/csv", json={"meter_register_id": current_register["meter_register_id"]})
 

@@ -163,3 +163,19 @@ def test_find_station_raises_upstream_service_error_on_network_error(tmp_path, m
 
     with pytest.raises(UpstreamServiceError, match="Stationssuche fehlgeschlagen"):
         provider.find_station(48.1, 11.5)
+
+
+def test_get_series_rejects_invalid_input_before_http_call(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = BrightSkyWeatherProvider(cache_dir=tmp_path)
+
+    def _should_not_be_called(_url: str, timeout: float):
+        del _url, timeout
+        raise AssertionError("urlopen sollte bei invaliden Parametern nicht aufgerufen werden")
+
+    monkeypatch.setattr("meterweb.infrastructure.providers.weather.urlopen", _should_not_be_called)
+
+    with pytest.raises(ValueError, match="resolution muss hourly oder daily sein"):
+        provider.get_series(52.52, 13.405, date(2025, 1, 1), date(2025, 1, 1), "weekly")
+
+    with pytest.raises(ValueError, match="start_date muss <= end_date sein"):
+        provider.get_series(52.52, 13.405, date(2025, 1, 2), date(2025, 1, 1), "daily")

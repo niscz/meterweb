@@ -1,8 +1,11 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+WeatherResolution = Literal["hourly", "daily"]
 
 
 class LoginRequest(BaseModel):
@@ -60,13 +63,19 @@ class WeatherSeriesRequest(BaseModel):
     lon: float = Field(ge=-180, le=180)
     start_date: date
     end_date: date
-    resolution: str = Field(default="daily", min_length=1)
+    resolution: WeatherResolution = "daily"
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "WeatherSeriesRequest":
+        if self.start_date > self.end_date:
+            raise ValueError("start_date muss <= end_date sein")
+        return self
 
 
 class WeatherSyncRequest(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
-    resolutions: list[str] = Field(default_factory=lambda: ["hourly", "daily"], min_length=1)
+    resolutions: list[WeatherResolution] = Field(default_factory=lambda: ["hourly", "daily"], min_length=1)
 
 
 class AnalyticsComputeAbsoluteRequest(BaseModel):

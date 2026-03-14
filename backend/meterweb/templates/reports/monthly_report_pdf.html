@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Monatsbericht</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      color: #1f2937;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead {
+      background-color: #f3f4f6;
+    }
+
+    th,
+    td {
+      border: 1px solid #d1d5db;
+      padding: 8px;
+      text-align: left;
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: #f9fafb;
+    }
+  </style>
+</head>
+<body>
+  <h1>Monatsbericht</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Monat</th>
+        <th>Ablesungen</th>
+        <th>Verbrauch</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.month }}</td>
+        <td>{{ row.readings }}</td>
+        <td>{{ row.consumption }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

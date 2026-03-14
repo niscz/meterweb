@@ -47,11 +47,7 @@ class ExportUseCase:
 
     def export_pdf(self, meter_point_id: UUID) -> bytes:
         rows = self.monthly_rows(meter_point_id)
-        html = "<h1>Monatsbericht</h1><table><tr><th>Monat</th><th>Ablesungen</th><th>Verbrauch</th></tr>"
-        for row in rows:
-            html += (
-                f"<tr><td>{row['month']}</td><td>{row['readings']}"
-                f"</td><td>{row['consumption']}</td></tr>"
-            )
-        html += "</table>"
-        return self._report_renderer.render_pdf(html)
+        return self._report_renderer.render_pdf_template(
+            "reports/monthly_report_pdf.html",
+            {"rows": rows},
+        )

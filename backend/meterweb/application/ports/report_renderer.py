@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class ReportRenderer(ABC):
     @abstractmethod
-    def render_pdf(self, html: str) -> bytes:
+    def render_pdf_template(self, template_path: str, context: dict[str, Any]) -> bytes:
         raise NotImplementedError
 
     @abstractmethod

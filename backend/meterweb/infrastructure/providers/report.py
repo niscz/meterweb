@@ -1,16 +1,27 @@
 import csv
 import io
+from pathlib import Path
+from typing import Any
 
 from meterweb.application.ports import ReportRenderer
 
 
 class WeasyPrintReportRenderer(ReportRenderer):
-    def render_pdf(self, html: str) -> bytes:
+    def __init__(self, template_dir: Path | None = None) -> None:
+        self._template_dir = template_dir or Path(__file__).resolve().parents[2] / "templates"
+
+    def render_pdf_template(self, template_path: str, context: dict[str, Any]) -> bytes:
         try:
+            from jinja2 import Environment, FileSystemLoader, select_autoescape
             from weasyprint import HTML
         except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("WeasyPrint ist nicht installiert.") from exc
+            raise RuntimeError("WeasyPrint und Jinja2 müssen installiert sein.") from exc
 
+        template_env = Environment(
+            loader=FileSystemLoader(str(self._template_dir)),
+            autoescape=select_autoescape(["html", "xml"]),
+        )
+        html = template_env.get_template(template_path).render(**context)
         return HTML(string=html).write_pdf()
 
     def render_xlsx(self, rows: list[dict[str, str]]) -> bytes:

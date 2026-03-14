@@ -2,11 +2,11 @@ import importlib
 import logging
 import os
 import shutil
-from pathlib import Path
 
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
+from meterweb.bootstrap import get_container
 from meterweb.infrastructure.auth import validate_runtime_security_config
 from meterweb.infrastructure.db import configure_database, init_db
 from meterweb.interfaces.http.errors import register_exception_handlers
@@ -60,7 +60,7 @@ def _feature_flags() -> dict[str, dict[str, object]]:
 
 
 def initialize_runtime_directories() -> None:
-    uploads_dir = Path(os.getenv("UPLOADS_DIR", "/uploads"))
+    uploads_dir = get_container().settings.uploads_dir
     try:
         uploads_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:

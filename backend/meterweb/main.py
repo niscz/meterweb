@@ -10,6 +10,7 @@ from meterweb.bootstrap import get_container
 from meterweb.infrastructure.auth import validate_runtime_security_config
 from meterweb.infrastructure.db import configure_database, init_db
 from meterweb.interfaces.http.errors import register_exception_handlers
+from meterweb.interfaces.http.upload_limits import MultipartUploadLimitMiddleware
 from meterweb.interfaces.http.router import router
 
 
@@ -89,6 +90,11 @@ def create_app() -> FastAPI:
         session_options["domain"] = session_domain
 
     app.add_middleware(SessionMiddleware, **session_options)
+    app.add_middleware(
+        MultipartUploadLimitMiddleware,
+        max_body_size_bytes=get_container().settings.photo_upload_max_size_bytes,
+        protected_paths=("/dashboard/readings/photo",),
+    )
     register_exception_handlers(app)
     app.include_router(router)
 

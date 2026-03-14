@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from meterweb.application.dto import PhotoReadingCreateDTO, ReadingCreateDTO
@@ -27,7 +27,47 @@ from meterweb.interfaces.http.dependencies import (
 templates = create_templates()
 router = APIRouter(tags=["web-readings"])
 
+
 UPLOAD_DIR = get_container().settings.uploads_dir
+PHOTO_UPLOAD_MAX_SIZE_BYTES = get_container().settings.photo_upload_max_size_bytes
+ALLOWED_PHOTO_MIME_TYPES = frozenset(get_container().settings.photo_upload_allowed_mime_types)
+ALLOWED_PHOTO_EXTENSIONS = frozenset(get_container().settings.photo_upload_allowed_extensions)
+PHOTO_UPLOAD_CHUNK_SIZE = 1024 * 1024
+
+
+def _cleanup_upload(file_path: Path | None) -> None:
+    if file_path and file_path.exists():
+        file_path.unlink(missing_ok=True)
+
+
+async def _save_upload_streaming(photo: UploadFile) -> Path:
+    suffix = Path(photo.filename or "upload.jpg").suffix.lower() or ".jpg"
+    content_type = (photo.content_type or "").lower()
+
+    if suffix not in ALLOWED_PHOTO_EXTENSIONS or content_type not in ALLOWED_PHOTO_MIME_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ungültiger Dateityp.")
+
+    file_path = UPLOAD_DIR / f"{uuid4()}{suffix}"
+    total_written = 0
+
+    try:
+        with file_path.open("wb") as target:
+            while True:
+                chunk = await photo.read(PHOTO_UPLOAD_CHUNK_SIZE)
+                if not chunk:
+                    break
+                total_written += len(chunk)
+                if total_written > PHOTO_UPLOAD_MAX_SIZE_BYTES:
+                    raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="Datei ist zu groß.")
+                target.write(chunk)
+    except Exception:
+        _cleanup_upload(file_path)
+        raise
+    finally:
+        await photo.close()
+
+    return file_path
+
 
 def _dashboard_response(
     request: Request,
@@ -132,16 +172,12 @@ async def create_photo_reading(
 ):
     require_auth(request)
     file_path: Path | None = None
-    upload_written = False
     try:
         parsed_meter_register_id = _resolve_register_id(session, meter_register_id, meter_point_id)
         parsed_measured_at = datetime.fromisoformat(measured_at)
         confirmed_value = Decimal(value) if value else None
 
-        suffix = Path(photo.filename or "upload.jpg").suffix or ".jpg"
-        file_path = UPLOAD_DIR / f"{uuid4()}{suffix}"
-        file_path.write_bytes(await photo.read())
-        upload_written = True
+        file_path = await _save_upload_streaming(photo)
 
         reading, ocr_result, plausibility = add_photo_reading_use_case.execute(
             PhotoReadingCreateDTO(
@@ -151,9 +187,11 @@ async def create_photo_reading(
             ),
             confirmed_value=confirmed_value,
         )
+    except HTTPException:
+        _cleanup_upload(file_path)
+        raise
     except (ValueError, InvalidOperation):
-        if upload_written and file_path and file_path.exists():
-            file_path.unlink(missing_ok=True)
+        _cleanup_upload(file_path)
         return _dashboard_response(
             request,
             analytics_use_case=analytics_use_case,
@@ -164,8 +202,7 @@ async def create_photo_reading(
             reading_error=translate(get_locale(request), "photo_reading_invalid_input"),
         )
     except (RuntimeError, FileNotFoundError):
-        if upload_written and file_path and file_path.exists():
-            file_path.unlink(missing_ok=True)
+        _cleanup_upload(file_path)
         return _dashboard_response(
             request,
             analytics_use_case=analytics_use_case,
@@ -176,8 +213,7 @@ async def create_photo_reading(
             reading_error=translate(get_locale(request), "photo_reading_ocr_failed"),
         )
     except Exception:
-        if upload_written and file_path and file_path.exists():
-            file_path.unlink(missing_ok=True)
+        _cleanup_upload(file_path)
         return _dashboard_response(
             request,
             analytics_use_case=analytics_use_case,

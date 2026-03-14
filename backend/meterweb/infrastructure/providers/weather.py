@@ -5,6 +5,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
+from meterweb.application.errors import UpstreamServiceError
 from meterweb.application.ports import WeatherProvider, WeatherSeriesPoint, WeatherSnapshot
 
 
@@ -28,7 +29,7 @@ class BrightSkyWeatherProvider(WeatherProvider):
             with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
                 data = json.load(response)
         except (HTTPError, URLError, TimeoutError) as exc:
-            raise ValueError("Bright Sky Stationssuche fehlgeschlagen.") from exc
+            raise UpstreamServiceError("Bright Sky Stationssuche fehlgeschlagen.") from exc
 
         sources = data.get("sources", []) if isinstance(data, dict) else []
         if not sources:
@@ -65,7 +66,7 @@ class BrightSkyWeatherProvider(WeatherProvider):
             with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
                 data = json.load(response)
         except (HTTPError, URLError, TimeoutError) as exc:
-            raise ValueError("Bright Sky Wetterabruf fehlgeschlagen.") from exc
+            raise UpstreamServiceError("Bright Sky Wetterabruf fehlgeschlagen.") from exc
 
         weather_entries = data.get("weather", [])
         if not weather_entries:
@@ -117,7 +118,7 @@ class BrightSkyWeatherProvider(WeatherProvider):
             with urlopen(url, timeout=self._timeout_seconds) as response:  # noqa: S310
                 data = json.load(response)
         except (HTTPError, URLError, TimeoutError) as exc:
-            raise ValueError("Bright Sky Wetterserienabruf fehlgeschlagen.") from exc
+            raise UpstreamServiceError("Bright Sky Wetterserienabruf fehlgeschlagen.") from exc
 
         weather_entries = data.get("weather", [])
         if not weather_entries:

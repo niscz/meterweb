@@ -1,11 +1,13 @@
 from uuid import uuid4
 
 import pytest
-from fastapi import status
+from fastapi import FastAPI, status
 from starlette.requests import Request
 
 from meterweb.application.dto import UnitViewDTO
+from meterweb.application.errors import UpstreamServiceError
 from meterweb.interfaces.http.api.v1 import router as api_router
+from meterweb.interfaces.http.errors import register_exception_handlers
 from meterweb.interfaces.http.schemas import UnitCreateRequest
 from meterweb.interfaces.http.web import router as web_router
 
@@ -51,3 +53,16 @@ def test_dashboard_create_building_returns_validation_response(monkeypatch) -> N
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.anyio
+async def test_upstream_service_error_maps_to_bad_gateway() -> None:
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    handler = app.exception_handlers[UpstreamServiceError]
+    request = Request({"type": "http", "method": "GET", "path": "/api/v1/weather", "headers": [], "query_string": b""})
+    response = await handler(request, UpstreamServiceError("Bright Sky Wetterserienabruf fehlgeschlagen."))
+
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert response.body == b'{"detail":"Bright Sky Wetterserienabruf fehlgeschlagen."}'

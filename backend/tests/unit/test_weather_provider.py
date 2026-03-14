@@ -5,6 +5,7 @@ from urllib.error import URLError
 
 import pytest
 
+from meterweb.application.errors import UpstreamServiceError
 from meterweb.infrastructure.providers.weather import BrightSkyWeatherProvider
 
 
@@ -151,7 +152,7 @@ def test_get_series_cache_miss_then_hit(tmp_path, monkeypatch: pytest.MonkeyPatc
     assert calls == 1
 
 
-def test_find_station_raises_value_error_on_network_error(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_find_station_raises_upstream_service_error_on_network_error(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     provider = BrightSkyWeatherProvider(cache_dir=tmp_path)
 
     def _failing_urlopen(_url: str, timeout: float):
@@ -160,5 +161,5 @@ def test_find_station_raises_value_error_on_network_error(tmp_path, monkeypatch:
 
     monkeypatch.setattr("meterweb.infrastructure.providers.weather.urlopen", _failing_urlopen)
 
-    with pytest.raises(ValueError, match="Stationssuche fehlgeschlagen"):
+    with pytest.raises(UpstreamServiceError, match="Stationssuche fehlgeschlagen"):
         provider.find_station(48.1, 11.5)

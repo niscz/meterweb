@@ -266,11 +266,17 @@ class JsonWeatherStationRepository(WeatherStationRepository):
         else:
             payload[str(building_id)] = station_id
 
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=self._storage_file.parent, delete=False) as handle:
-            handle.write(json.dumps(payload))
-            temp_path = Path(handle.name)
+        temp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=self._storage_file.parent, delete=False) as handle:
+                handle.write(json.dumps(payload))
+                temp_path = Path(handle.name)
 
-        temp_path.replace(self._storage_file)
+            temp_path.replace(self._storage_file)
+        except Exception:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+            raise
 
     def _load(self) -> dict[str, str]:
         if not self._storage_file.exists():

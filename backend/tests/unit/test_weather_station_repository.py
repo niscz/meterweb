@@ -1,4 +1,7 @@
+from pathlib import Path
 import json
+
+import pytest
 from uuid import uuid4
 
 from meterweb.infrastructure.repositories import JsonWeatherStationRepository
@@ -26,3 +29,22 @@ def test_set_override_writes_and_removes_entries_atomically(tmp_path) -> None:
 
     repository.set_override(building_id, None)
     assert json.loads(storage_file.read_text(encoding="utf-8")) == {}
+
+
+def test_set_override_cleans_up_temp_file_when_replace_fails(tmp_path, monkeypatch) -> None:
+    storage_file = tmp_path / "weather_overrides.json"
+    repository = JsonWeatherStationRepository(storage_file)
+
+    def _raise_replace(self, target):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(Path, "replace", _raise_replace)
+
+    building_id = uuid4()
+
+    temp_files_before = set(tmp_path.iterdir())
+    with pytest.raises(OSError, match="replace failed"):
+        repository.set_override(building_id, "station-123")
+
+    temp_files_after = set(tmp_path.iterdir())
+    assert temp_files_after == temp_files_before

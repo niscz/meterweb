@@ -112,3 +112,27 @@ def test_login_attempt_guard_unlocks_after_lock_duration_elapsed() -> None:
 
     assert guard.is_locked("account:admin", now=start + timedelta(seconds=20)) is True
     assert guard.is_locked("account:admin", now=start + timedelta(seconds=36)) is False
+
+
+def test_login_attempt_guard_evicts_stale_attempt_buckets() -> None:
+    guard = LoginAttemptGuard(max_attempts=3, window_seconds=10, lock_duration_seconds=30)
+    start = datetime(2026, 1, 1, 12, 0, 0)
+
+    guard.register_failure("account:random-user", now=start)
+    assert "account:random-user" in guard._buckets
+
+    guard.is_locked("account:other", now=start + timedelta(seconds=11))
+
+    assert "account:random-user" not in guard._buckets
+
+
+def test_login_attempt_guard_register_success_removes_bucket() -> None:
+    guard = LoginAttemptGuard(max_attempts=3, window_seconds=60, lock_duration_seconds=30)
+    start = datetime(2026, 1, 1, 12, 0, 0)
+
+    guard.register_failure("account:admin", now=start)
+    assert "account:admin" in guard._buckets
+
+    guard.register_success("account:admin", now=start + timedelta(seconds=1))
+
+    assert "account:admin" not in guard._buckets

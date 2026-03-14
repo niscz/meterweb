@@ -7,7 +7,8 @@ from meterweb.application.dto import LoginDTO
 from meterweb.application.use_cases.auth import LoginUseCase
 from meterweb.domain.auth import AuthenticationError
 from meterweb.interfaces.http.common import enforce_csrf, TRANSLATIONS, get_locale
-from meterweb.interfaces.http.dependencies import get_login_attempt_guard, get_login_use_case
+from meterweb.infrastructure.settings import AppSettings
+from meterweb.interfaces.http.dependencies import get_app_settings, get_login_attempt_guard, get_login_use_case
 from meterweb.interfaces.http.web.auth_security import LoginAttemptGuard
 from meterweb.interfaces.http.templating import create_templates
 
@@ -27,12 +28,22 @@ def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", {"error": None, "lang": lang})
 
 
-def _client_ip(request: Request) -> str:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",", 1)[0].strip()
+def _client_ip(request: Request, settings: AppSettings) -> str:
     client = request.client
-    return client.host if client else "unknown"
+    peer_ip = client.host if client else "unknown"
+
+    if not settings.trust_proxy_headers:
+        return peer_ip
+
+    if peer_ip not in settings.trusted_proxy_ips:
+        return peer_ip
+
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if not forwarded_for:
+        return peer_ip
+
+    first_hop = forwarded_for.split(",", 1)[0].strip()
+    return first_hop or peer_ip
 
 
 @router.post("/login", dependencies=[Depends(enforce_csrf)])
@@ -42,9 +53,10 @@ def login_submit(
     password: str = Form(),
     use_case: LoginUseCase = Depends(get_login_use_case),
     login_guard: LoginAttemptGuard = Depends(get_login_attempt_guard),
+    settings: AppSettings = Depends(get_app_settings),
 ):
     lang = get_locale(request)
-    ip_address = _client_ip(request)
+    ip_address = _client_ip(request, settings)
     keys = (f"ip:{ip_address}", f"account:{username.strip().lower()}")
 
     if any(login_guard.is_locked(key) for key in keys):

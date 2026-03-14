@@ -23,6 +23,8 @@ class AppSettings:
     login_max_attempts: int = 5
     login_attempt_window_seconds: int = 300
     login_lock_duration_seconds: int = 300
+    trust_proxy_headers: bool = False
+    trusted_proxy_ips: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -49,6 +51,8 @@ class AppSettings:
             login_max_attempts=_env_int("LOGIN_MAX_ATTEMPTS", 5),
             login_attempt_window_seconds=_env_int("LOGIN_ATTEMPT_WINDOW_SECONDS", 300),
             login_lock_duration_seconds=_env_int("LOGIN_LOCK_DURATION_SECONDS", 300),
+            trust_proxy_headers=_env_bool("TRUST_PROXY_HEADERS", False),
+            trusted_proxy_ips=_env_list("TRUSTED_PROXY_IPS", ()) if os.getenv("TRUSTED_PROXY_IPS") else (),
         )
 
     def provider_config(self) -> ProviderConfig:
@@ -81,6 +85,18 @@ def _env_list(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
     if not values:
         raise RuntimeError(f"Environment variable {name} must not be empty")
     return values
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError(f"Environment variable {name} must be a boolean value")
 
 
 def _normalize_extensions(values: tuple[str, ...]) -> tuple[str, ...]:

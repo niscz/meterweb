@@ -2,7 +2,7 @@ import json
 import logging
 import tempfile
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -122,8 +122,15 @@ class SqlAlchemyReadingRepository(ReadingRepository):
 
         parsed_candidates: list[OCRCandidateDTO] = []
         if row.ocr_candidates:
-            for item in json.loads(row.ocr_candidates):
-                parsed_candidates.append(OCRCandidateDTO(value=Decimal(str(item["value"])), confidence=float(item["confidence"])))
+            try:
+                for item in json.loads(row.ocr_candidates):
+                    parsed_candidates.append(OCRCandidateDTO(value=Decimal(str(item["value"])), confidence=float(item["confidence"])))
+            except (json.JSONDecodeError, TypeError, KeyError, ValueError, InvalidOperation) as exc:
+                parsed_candidates = []
+                logger.warning(
+                    "invalid_ocr_candidates_payload",
+                    extra={"reading_id": row.id, "error": str(exc)},
+                )
 
         return ReadingOCRMetadataDTO(
             image_path=row.image_path,

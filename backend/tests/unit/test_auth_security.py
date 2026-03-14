@@ -1,7 +1,10 @@
+from datetime import datetime, timedelta
+
 import pytest
 
 from meterweb.domain.auth import AuthenticationError, Credentials
 from meterweb.infrastructure.auth import EnvAuthenticator, validate_runtime_security_config
+from meterweb.interfaces.http.web.auth_security import LoginAttemptGuard
 
 
 def test_create_app_fails_when_secret_key_missing(monkeypatch) -> None:
@@ -78,3 +81,34 @@ def test_env_authenticator_uses_hashed_password(monkeypatch, tmp_path) -> None:
 
     with pytest.raises(AuthenticationError):
         authenticator.authenticate(Credentials(username="admin_user", password="falsches-passwort"))
+
+
+def test_login_attempt_guard_allows_normal_login_after_success() -> None:
+    guard = LoginAttemptGuard(max_attempts=3, window_seconds=60, lock_duration_seconds=120)
+
+    guard.register_failure("account:admin")
+    guard.register_success("account:admin")
+
+    assert guard.is_locked("account:admin") is False
+
+
+def test_login_attempt_guard_locks_after_repeated_failures() -> None:
+    guard = LoginAttemptGuard(max_attempts=3, window_seconds=60, lock_duration_seconds=120)
+    start = datetime(2026, 1, 1, 12, 0, 0)
+
+    guard.register_failure("ip:127.0.0.1", now=start)
+    guard.register_failure("ip:127.0.0.1", now=start + timedelta(seconds=10))
+    guard.register_failure("ip:127.0.0.1", now=start + timedelta(seconds=20))
+
+    assert guard.is_locked("ip:127.0.0.1", now=start + timedelta(seconds=30)) is True
+
+
+def test_login_attempt_guard_unlocks_after_lock_duration_elapsed() -> None:
+    guard = LoginAttemptGuard(max_attempts=2, window_seconds=60, lock_duration_seconds=30)
+    start = datetime(2026, 1, 1, 12, 0, 0)
+
+    guard.register_failure("account:admin", now=start)
+    guard.register_failure("account:admin", now=start + timedelta(seconds=5))
+
+    assert guard.is_locked("account:admin", now=start + timedelta(seconds=20)) is True
+    assert guard.is_locked("account:admin", now=start + timedelta(seconds=36)) is False
